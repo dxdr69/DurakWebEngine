@@ -73,7 +73,7 @@ module.exports = class Dealer {
         this.trumpSuit = null;
     }
 
-    getDeckInUse()
+    getDeck()
     {
         return this.deckInUse;
     }
@@ -86,7 +86,7 @@ module.exports = class Dealer {
         }
     }
 
-    serverDealCardsNewRound()
+    setPlayerHand()
     {
         let playerHand = [];
 
@@ -100,29 +100,36 @@ module.exports = class Dealer {
         return playerHand;
     }
 
-    serverSetTrumpSuit()
+    setTrumpSuit()
     {
         let randomCard = this.deckInUse[Math.floor(Math.random() * this.deckInUse.length)];
-        let suite = randomCard.substring(1);
+        let suit = randomCard.substr(1, 1);
 
-        if (suite === "A")
+        if (suit === "A" || suit === "0")
         {
-            while (suite === "A")
+            if (suit === "A")
             {
-                randomCard = this.deckInUse[Math.floor(Math.random() * this.deckInUse.length)];
-
-                if (randomCard.length === 3)
+                while (suit === "A")
                 {
-                    suite = randomCard.substr(2, 1);
+                    randomCard = this.deckInUse[Math.floor(Math.random() * this.deckInUse.length)];
+    
+                    if (randomCard.length === 3)
+                    {
+                        suit = randomCard.substr(2, 1);
+                    }
+                    else
+                    {
+                        suit = randomCard.substring(1)
+                    }
                 }
-                else
-                {
-                    suite = randomCard.substring(1)
-                }
+            }
+            else
+            {
+                suit = randomCard.substr(2, 1);
             }
         }
 
-        this.trumpSuit = suite;
+        this.trumpSuit = suit;
         return this.trumpSuit;
     }
 }

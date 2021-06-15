@@ -1,0 +1,20 @@
+body {
+    background-color: darkorchid;
+}
+
+.join-container {
+    margin-top: 10%;
+}
+
+.join-card-body {
+    padding: 1rem 4rem 2rem
+}
+
+.button-div {
+    padding: 1rem 0rem 0rem;
+}
+
+.join-button {
+    background-color: darkorchid;
+}
+

@@ -13,15 +13,33 @@ app.use(express.urlencoded({extended: true}));
 const server = http.createServer(app);
 const io = new Server(server);
 
+let nicknames = [];
 let players = [];
 let spectators = [];
+
+let currentLeader = null;
+
 const theDealer = new Dealer();
-let currentLeaderID = null;
 
 
 
 app.get('/', (req, res) => {
-    res.render('home');
+    res.redirect('join');
+});
+
+app.get('/join', (req, res) => {
+    res.render('join');
+});
+
+app.get('/lobby', (req, res) => {
+    const nickname = decodeURIComponent(req.query.nickname);
+    nicknames.push(nickname);
+    res.render('lobby');
+});
+
+app.post('/join', (req, res) => {
+    const nickname = encodeURIComponent(req.body.nickname);
+    res.redirect(`/lobby?nickname=${nickname}`);
 });
 
 
@@ -29,84 +47,129 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
     console.log(`New user connected: ${socket.id}`);
 
+    const lobbyRoom = 'lobby';
     const playerRoom = 'players';
     const spectatorRoom = 'spectators';
 
     if (players.length === 0)
     {
-        currentLeaderID = socket.id;
-
+        socket.join(lobbyRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${lobbyRoom}`);
         socket.join(playerRoom);
         console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
 
         const player = {
             id: socket.id,
-            hand: [],
-            isLeader: true
+            isLeader: true,
+            nickname: nicknames.splice(0,1)[0],
+            hand: []
         };
 
         players.push(player);
 
-        io.to(currentLeaderID).emit('isLeader');
-        console.log(`User with ID of: ${socket.id} has been set as leader`);
+        currentLeader = {
+            id: player.id,
+            nickname: player.nickname
+        };
+
+        console.log(`User with ID of: ${currentLeader.id} has been set as leader`);
+        io.to(currentLeader.id).emit('setLobbyLeader', 'leader', currentLeader.nickname);
+        
+        if (spectators.length > 0)
+        {
+            io.to(spectatorRoom).emit('setLobbyLeader', null, currentLeader.nickname);
+
+            let spectatorNicknames = [];
+
+            for (let i = 0; i < spectators.length; i++)
+            {
+                spectatorNicknames.push(spectators[i].nickname);
+            }
+
+            io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
+        }
     }
-    else if (players.length < 2)
+    else if (players.length >= 1 && players.length < 4)
     {
+        socket.join(lobbyRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${lobbyRoom}`);
         socket.join(playerRoom);
         console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
-
+        
         const player = {
             id: socket.id,
-            hand: [],
-            isLeader: false
+            isLeader: false,
+            nickname: nicknames.splice(0,1)[0],
+            hand: []
         };
 
         players.push(player);
 
+        io.to(socket.id).emit('setLobbyLeader', 'player', currentLeader.nickname);
 
-        io.to(currentLeaderID).emit('newRoundPrep');
-        console.log(`New round of Durak started with 2 players`);
-    }
-    else if (players.length >= 2 && players.length < 4 )
-    {
-        let player = {
-            id: socket.id,
-            hand: [],
-            isLeader: false
-        };
 
-        players.push(player);
+        let playerNicknames = [];
 
-        console.log(`New round of Durak started with ${players.length} players`);
+        for (let i = 1; i < players.length; i++)
+        {
+            playerNicknames.push(players[i].nickname);
+        }
+
+        io.in(lobbyRoom).emit('joinLobby', 'leader', playerNicknames, null, currentLeader.id);
+        io.in(lobbyRoom).emit('joinLobby', 'normal', playerNicknames, null, currentLeader.id);
     }
     else
     {
+        socket.join(lobbyRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${lobbyRoom}`);
+        socket.join(spectatorRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
+
         let spectator = {
-            id: socket.id
+            id: socket.id,
+            nickname: nicknames.splice(0,1)[0]
         };
 
         spectators.push(spectator);
 
-        io.emit('spectate');
+        io.to(socket.id).emit('setLobbyLeader', 'spectator', currentLeader.nickname);
+
+
+        let playerNicknames = [];
+
+        for (let i = 1; i < players.length; i++)
+        {
+            playerNicknames.push(players[i].nickname);
+        }
+
+        let spectatorNicknames = [];
+
+        for (let i = 0; i < spectators.length; i++)
+        {
+            spectatorNicknames.push(spectators[i].nickname);
+        }
+
+        io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
+        io.in(lobbyRoom).emit('joinLobby', 'normal', playerNicknames, spectatorNicknames, currentLeader.id);
     }
-    
+
     socket.on('newRoundPrep', () => {
         theDealer.resetDeck();
 
         players.forEach(player => {
-            player.hand = theDealer.serverDealCardsNewRound();
+            player.hand = theDealer.setPlayerHand();
         });
 
-        console.log('All players have been dealt their first hand');
+        console.log('All players hands have been set');
 
-        const trumpSuit = theDealer.serverSetTrumpSuit();
+        const trumpSuit = theDealer.setTrumpSuit();
 
         console.log(`Trump suit for this round is: ${trumpSuit}`);
 
-        io.in(playerRoom).emit('newRoundDealPrep');
+        io.in(playerRoom).emit('firstTurnDealPrep');
     });
 
-    socket.on('newRoundDealPrep', () => {
+    socket.on('firstTurnDealPrep', () => {
         let playersInfo = [];
 
         for (let i = 0; i < players.length; i++)
@@ -114,16 +177,8 @@ io.on('connection', (socket) => {
             playersInfo.push( { "id": players[i].id, "hand": players[i].hand } );
         }
 
-        io.to(playerRoom).emit('newRoundDeal', playersInfo);
+        io.to(playerRoom).emit('firstTurnDeal', playersInfo);
     });
-
-    socket.on('cardPlayedTo', (game, isTurnToPlay) => {
-        //io.emit('cardPlayedTo', gameObject, isTurnToPlay)
-    });
-
-    socket.on('cardPlayedOn', (game, isBeingPlayedTo) => {
-        //io.emit('cardPlayedOn', gameObject, isBeingPlayedTo)
-    })
 
     socket.on('disconnect', () => {
         console.log(`A user disconnected: ${socket.id}`);
@@ -143,9 +198,13 @@ io.on('connection', (socket) => {
         if (players.length > 0)
         {
             players[0].isLeader = true;
-            currentLeaderID = players[0].id;
-            console.log(`Player with ID of: ${currentLeaderID} has been set as the new leader`);
-            io.to(currentLeaderID).emit('isLeader');
+            currentLeader.id = players[0].id;
+            currentLeader.nickname = players[0].nickname;
+            console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+        }
+        else
+        {
+            console.log('All players have disconnected');
         }
     });
 });

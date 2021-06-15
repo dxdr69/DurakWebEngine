@@ -94,7 +94,7 @@ class Durak extends Phaser.Scene {
             console.log(`Your ID is: ${self.socket.id}`);
         });
 
-        this.socket.on('isLeader', () => {
+        this.socket.on('setLeader', () => {
             self.isLeader = true;
             console.log('You are currently the leader');
         });
@@ -103,11 +103,11 @@ class Durak extends Phaser.Scene {
             this.socket.emit('newRoundPrep');
         });
 
-        this.socket.on('newRoundDealPrep', () => {
-            this.socket.emit('newRoundDealPrep');
+        this.socket.on('firstTurnDealPrep', () => {
+            this.socket.emit('firstTurnDealPrep');
         });
 
-        this.socket.on('newRoundDeal', (playersInfo) => {
+        this.socket.on('firstTurnDeal', (playersInfo) => {
             let opponentSprite = 'cardBack';
     
             playersInfo.forEach(player => {
