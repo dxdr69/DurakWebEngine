@@ -73,6 +73,7 @@ io.on('connection', (socket) => {
         };
 
         console.log(`User with ID of: ${currentLeader.id} has been set as leader`);
+        io.to(currentLeader.id).emit('changeLeaderID', currentLeader.id);
         io.to(currentLeader.id).emit('setLobbyLeader', 'leader', currentLeader.nickname);
         
         if (spectators.length > 0)
@@ -80,11 +81,7 @@ io.on('connection', (socket) => {
             io.to(spectatorRoom).emit('setLobbyLeader', null, currentLeader.nickname);
 
             let spectatorNicknames = [];
-
-            for (let i = 0; i < spectators.length; i++)
-            {
-                spectatorNicknames.push(spectators[i].nickname);
-            }
+            spectators.forEach(spectator => spectatorNicknames.push(spectator.nickname));
 
             io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
         }
@@ -105,6 +102,7 @@ io.on('connection', (socket) => {
 
         players.push(player);
 
+        io.to(socket.id).emit('changeLeaderID', currentLeader.id);
         io.to(socket.id).emit('setLobbyLeader', 'player', currentLeader.nickname);
 
 
@@ -117,6 +115,13 @@ io.on('connection', (socket) => {
 
         io.in(lobbyRoom).emit('joinLobby', 'leader', playerNicknames, null, currentLeader.id);
         io.in(lobbyRoom).emit('joinLobby', 'normal', playerNicknames, null, currentLeader.id);
+
+        if (spectators.length > 0)
+        {
+            let spectatorNicknames = [];
+            spectators.forEach(spectator => spectatorNicknames.push(spectator.nickname));
+            io.to(socket.id).emit('joinLobby', 'normal', null, spectatorNicknames, currentLeader.id);
+        }
     }
     else
     {
@@ -125,13 +130,14 @@ io.on('connection', (socket) => {
         socket.join(spectatorRoom);
         console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
 
-        let spectator = {
+        const spectator = {
             id: socket.id,
             nickname: nicknames.splice(0,1)[0]
         };
 
         spectators.push(spectator);
 
+        io.to(socket.id).emit('changeLeaderID', currentLeader.id);
         io.to(socket.id).emit('setLobbyLeader', 'spectator', currentLeader.nickname);
 
 
@@ -143,15 +149,139 @@ io.on('connection', (socket) => {
         }
 
         let spectatorNicknames = [];
-
-        for (let i = 0; i < spectators.length; i++)
-        {
-            spectatorNicknames.push(spectators[i].nickname);
-        }
+        spectators.forEach(spectator => spectatorNicknames.push(spectator.nickname));
 
         io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
         io.in(lobbyRoom).emit('joinLobby', 'normal', playerNicknames, spectatorNicknames, currentLeader.id);
     }
+
+    socket.on('changeLeaderToSpectator', () => {
+        const spectator = {
+            id: currentLeader.id,
+            nickname: currentLeader.nickname
+        };
+
+        players.splice(0,1);
+        spectators.push(spectator);
+
+        socket.leave(playerRoom);
+        console.log(`User with ID: ${socket.id} left room: ${playerRoom}`);
+        socket.join(spectatorRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
+
+        let spectatorNicknames = [];
+        spectators.forEach(spectator => spectatorNicknames.push(spectator.nickname));
+
+        if (players.length > 0)
+        {
+            players[0].isLeader = true;
+            currentLeader.id = players[0].id;
+            currentLeader.nickname = players[0].nickname;
+            console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+
+            io.in(lobbyRoom).emit('changeLeaderID', currentLeader.id);
+            io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader.nickname);
+            io.to(socket.id).emit('leaderToSpectator');
+            io.to(currentLeader.id).emit('playerToLeader');
+            io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
+            io.in(lobbyRoom).emit('joinLobby', 'normal', null, spectatorNicknames, currentLeader.id);
+        }
+        else
+        {
+            currentLeader = null;
+            console.log('Player list currently empty');
+
+            io.in(lobbyRoom).emit('changeLeaderID', currentLeader);
+            io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader);
+            io.to(socket.id).emit('leaderToSpectator');
+            io.in(lobbyRoom).emit('joinLobby', 'normal', null, spectatorNicknames, currentLeader);
+        }
+    });
+
+    socket.on('changePlayerToSpectator', () => {
+        let spectator = null;
+
+        players.forEach(player => {
+            if (socket.id === player.id)
+            {
+                spectator = {
+                    id: player.id,
+                    nickname: player.nickname
+                };
+
+                players.splice(players.indexOf(player), 1);
+                spectators.push(spectator);
+            }
+        });
+
+        socket.leave(playerRoom);
+        console.log(`User with ID: ${socket.id} left room: ${playerRoom}`);
+        socket.join(spectatorRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
+
+        let spectatorNicknames = [];
+        spectators.forEach(spectator => spectatorNicknames.push(spectator.nickname));
+
+        io.in(lobbyRoom).emit('changeLobbyPlayer', spectator.nickname);
+        io.to(socket.id).emit('playerToSpectator');
+        io.in(lobbyRoom).emit('joinLobby', 'leader', null, spectatorNicknames, currentLeader.id);
+        io.in(lobbyRoom).emit('joinLobby', 'normal', null, spectatorNicknames, currentLeader.id);
+    });
+
+    socket.on('changeSpectatorToPlayer', () => {
+        let player = null;
+
+        spectators.forEach(spectator => {
+            if (socket.id === spectator.id)
+            {
+                player = {
+                    id: spectator.id,
+                    isLeader: false,
+                    nickname: spectator.nickname,
+                    hand: []
+                };
+
+                spectators.splice(spectators.indexOf(spectator), 1);
+                players.push(player);
+            }
+        });
+
+        socket.leave(spectatorRoom);
+        console.log(`User with ID: ${socket.id} left room: ${spectatorRoom}`);
+        socket.join(playerRoom);
+        console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
+
+        if (players.length === 1)
+        {
+            player.isLeader = true;
+
+            currentLeader = {
+                id: player.id,
+                nickname: player.nickname
+            };
+
+            console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+
+            io.in(lobbyRoom).emit('changeLeaderID', currentLeader.id);
+            io.in(lobbyRoom).emit('changeLobbySpectator', currentLeader.nickname);
+            io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader.nickname);
+            io.to(socket.id).emit('spectatorToLeader');
+        }
+        else
+        {
+            let playerNicknames = [];
+
+            for (let i = 1; i < players.length; i++)
+            {
+                playerNicknames.push(players[i].nickname);
+            }
+
+            io.in(lobbyRoom).emit('changeLobbySpectator', player.nickname);
+            io.to(socket.id).emit('spectatorToPlayer');
+            io.in(lobbyRoom).emit('joinLobby', 'leader', playerNicknames, null, currentLeader.id);
+            io.in(lobbyRoom).emit('joinLobby', 'normal', playerNicknames, null, currentLeader.id);
+        }
+    });
 
     socket.on('newRoundPrep', () => {
         theDealer.resetDeck();
@@ -183,28 +313,57 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`A user disconnected: ${socket.id}`);
 
+        let removedUser = null;
+        let userType = null;
+
         let disconnectedUserIndex = players.findIndex(player => player.id === socket.id);
 
         if (disconnectedUserIndex !== -1)
         {
-            players.splice(disconnectedUserIndex, 1);
+            removedUser = players.splice(disconnectedUserIndex, 1)[0];
+            userType = 'player';
         }
         else
         {
             disconnectedUserIndex = spectators.findIndex(spectator => spectator.id === socket.id);
-            spectators.splice(disconnectedUserIndex, 1);
+            removedUser = spectators.splice(disconnectedUserIndex, 1)[0];
+            userType = 'spectator';
         }
         
-        if (players.length > 0)
+        if (userType === 'player')
         {
-            players[0].isLeader = true;
-            currentLeader.id = players[0].id;
-            currentLeader.nickname = players[0].nickname;
-            console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+            if (players.length > 0 && removedUser.id === currentLeader.id)
+            {
+                players[0].isLeader = true;
+                currentLeader.id = players[0].id;
+                currentLeader.nickname = players[0].nickname;
+                console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+    
+                io.in(lobbyRoom).emit('changeLeaderID', currentLeader.id);
+                io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader.nickname);
+            }
+            else if (players.length > 0)
+            {
+                io.in(lobbyRoom).emit('changeLobbyPlayer', removedUser.nickname);
+            }
+            else
+            {
+                console.log('All players have disconnected');
+                
+                currentLeader = null;
+
+                io.in(lobbyRoom).emit('changeLeaderID', currentLeader);
+                io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader);
+            }
         }
         else
         {
-            console.log('All players have disconnected');
+            io.in(lobbyRoom).emit('changeLobbySpectator', removedUser.nickname);
+        }
+
+        if (players.length === 0 && spectators.length === 0)
+        {
+            console.log('All users disconnected');
         }
     });
 });

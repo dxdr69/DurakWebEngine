@@ -1,9 +1,164 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 const socket = io();
+
+let currentLeaderID = null;
+
+const playerForm = document.getElementById("player-buttons");
+const spectatorForm = document.getElementById("spectator-buttons");
+
+playerForm.addEventListener('submit', e => {
+    e.preventDefault();
+    
+    if (socket.id === currentLeaderID)
+    {
+        if (e.target.id === 'btn-start-round')
+        {
+            return false;
+        }
+        else
+        {
+            socket.emit('changeLeaderToSpectator');
+        }
+    }
+    else
+    {
+        socket.emit('changePlayerToSpectator');
+    }
+});
+
+spectatorForm.addEventListener('submit', e => {
+    e.preventDefault();
+
+    let playerList = document.getElementById("player-list");
+    const playerListLength = playerList.getElementsByTagName("li").length;
+
+    if (playerListLength === 4)
+    {
+        return false;
+    }
+    else
+    {
+        socket.emit('changeSpectatorToPlayer');
+    }
+});
+
+
 
 socket.on('connect', () => {
     console.log('Client connected');
     console.log(`Your ID is: ${socket.id}`);
+});
+
+socket.on('changeLeaderID', (leaderID) => {
+    currentLeaderID = leaderID;
+});
+
+socket.on('leaderToSpectator', () => {
+    let playerButtons = document.getElementById("player-buttons");
+
+    while (playerButtons.childNodes.length > 0)
+    {
+        playerButtons.removeChild(playerButtons.childNodes[0]);
+    }
+
+    let spectatorButtons = document.getElementById("spectator-buttons");
+
+    const btnBecomePlayer = document.createElement("button");
+    btnBecomePlayer.appendChild(document.createTextNode('Become player'));
+    btnBecomePlayer.setAttribute("type", "submit");
+    btnBecomePlayer.setAttribute("id", "btn-become-player");
+    btnBecomePlayer.setAttribute("class", "btn btn-success");
+
+    spectatorButtons.appendChild(btnBecomePlayer);
+});
+
+socket.on('playerToLeader', () => {
+    let playerButtons = document.getElementById("player-buttons");
+
+    while (playerButtons.childNodes.length > 0)
+    {
+        playerButtons.removeChild(playerButtons.childNodes[0]);
+    }
+
+    const btnStartRound = document.createElement("button");
+    btnStartRound.appendChild(document.createTextNode('Start new round'));
+    btnStartRound.setAttribute("type", "submit");
+    btnStartRound.setAttribute("id", "btn-start-round");
+    btnStartRound.setAttribute("class", "btn btn-success");
+
+    const btnBecomeSpectator = document.createElement("button");
+    btnBecomeSpectator.appendChild(document.createTextNode('Become spectator'));
+    btnBecomeSpectator.setAttribute("type", "submit");
+    btnBecomeSpectator.setAttribute("id", "btn-become-spectator");
+    btnBecomeSpectator.setAttribute("class", "btn btn-danger");
+
+    playerButtons.appendChild(btnStartRound);
+    playerButtons.appendChild(btnBecomeSpectator);
+});
+
+socket.on('playerToSpectator', () => {
+    let playerButtons = document.getElementById("player-buttons");
+
+    while (playerButtons.childNodes.length > 0)
+    {
+        playerButtons.removeChild(playerButtons.childNodes[0]);
+    }
+
+    let spectatorButtons = document.getElementById("spectator-buttons");
+
+    const btnBecomePlayer = document.createElement("button");
+    btnBecomePlayer.appendChild(document.createTextNode('Become player'));
+    btnBecomePlayer.setAttribute("type", "submit");
+    btnBecomePlayer.setAttribute("id", "btn-become-player");
+    btnBecomePlayer.setAttribute("class", "btn btn-success");
+
+    spectatorButtons.appendChild(btnBecomePlayer);
+});
+
+socket.on('spectatorToLeader', () => {
+    let spectatorButtons = document.getElementById("spectator-buttons");
+
+    while (spectatorButtons.childNodes.length > 0)
+    {
+        spectatorButtons.removeChild(spectatorButtons.childNodes[0]);
+    }
+
+    let playerButtons = document.getElementById("player-buttons");
+
+    const btnStartRound = document.createElement("button");
+    btnStartRound.appendChild(document.createTextNode('Start new round'));
+    btnStartRound.setAttribute("type", "submit");
+    btnStartRound.setAttribute("id", "btn-start-round");
+    btnStartRound.setAttribute("class", "btn btn-success");
+
+    const btnBecomeSpectator = document.createElement("button");
+    btnBecomeSpectator.appendChild(document.createTextNode('Become spectator'));
+    btnBecomeSpectator.setAttribute("type", "submit");
+    btnBecomeSpectator.setAttribute("id", "btn-become-spectator");
+    btnBecomeSpectator.setAttribute("class", "btn btn-danger");
+
+    playerButtons.appendChild(btnStartRound);
+    playerButtons.appendChild(btnBecomeSpectator);
+});
+
+socket.on('spectatorToPlayer', () => {
+    let spectatorButtons = document.getElementById("spectator-buttons");
+
+    while (spectatorButtons.childNodes.length > 0)
+    {
+        spectatorButtons.removeChild(spectatorButtons.childNodes[0]);
+    }
+
+    let playerButtons = document.getElementById("player-buttons");
+
+    const btnBecomeSpectator = document.createElement("button");
+    btnBecomeSpectator.appendChild(document.createTextNode('Become spectator'));
+    btnBecomeSpectator.setAttribute("type", "submit");
+    btnBecomeSpectator.setAttribute("id", "btn-become-spectator");
+    btnBecomeSpectator.setAttribute("class", "btn btn-danger");
+
+    playerButtons.appendChild(btnBecomeSpectator);
 });
 
 socket.on('setLobbyLeader', (userType, leaderNickname) => {
@@ -21,18 +176,119 @@ socket.on('setLobbyLeader', (userType, leaderNickname) => {
 
     if (userType === 'leader')
     {
-        document.getElementById("player-buttons").innerHTML = `<button class="btn btn-success">Start new round</button>
-                                                               <button class="btn btn-danger">Become spectator</button>`;
+        let playerButtons = document.getElementById("player-buttons");
+
+        const btnStartRound = document.createElement("button");
+        btnStartRound.appendChild(document.createTextNode('Start new round'));
+        btnStartRound.setAttribute("type", "submit");
+        btnStartRound.setAttribute("id", "btn-start-round");
+        btnStartRound.setAttribute("class", "btn btn-success");
+
+        const btnBecomeSpectator = document.createElement("button");
+        btnBecomeSpectator.appendChild(document.createTextNode('Become spectator'));
+        btnBecomeSpectator.setAttribute("type", "submit");
+        btnBecomeSpectator.setAttribute("id", "btn-become-spectator");
+        btnBecomeSpectator.setAttribute("class", "btn btn-danger");
+
+        playerButtons.appendChild(btnStartRound);
+        playerButtons.appendChild(btnBecomeSpectator);
     }
 
     if (userType === 'player')
     {
-        document.getElementById("player-buttons").innerHTML = '<button class="btn btn-danger">Become spectator</button>';
+        let playerButtons = document.getElementById("player-buttons");
+
+        const btnBecomeSpectator = document.createElement("button");
+        btnBecomeSpectator.appendChild(document.createTextNode('Become spectator'));
+        btnBecomeSpectator.setAttribute("type", "submit");
+        btnBecomeSpectator.setAttribute("id", "btn-become-spectator");
+        btnBecomeSpectator.setAttribute("class", "btn btn-danger");
+
+        playerButtons.appendChild(btnBecomeSpectator);
     }
 
     if (userType === 'spectator')
     {
-        document.getElementById("spectator-buttons").innerHTML = '<button class="btn btn-success">Become player</button>';
+        let spectatorButtons = document.getElementById("spectator-buttons");
+
+        const btnBecomePlayer = document.createElement("button");
+        btnBecomePlayer.appendChild(document.createTextNode('Become player'));
+        btnBecomePlayer.setAttribute("type", "submit");
+        btnBecomePlayer.setAttribute("id", "btn-become-player");
+        btnBecomePlayer.setAttribute("class", "btn btn-success");
+
+        spectatorButtons.appendChild(btnBecomePlayer);
+    }
+});
+
+socket.on('changeLobbyLeader', leaderNickname => {
+    let playerList = document.getElementById("player-list");
+    const elements = playerList.getElementsByTagName("li");
+    const length = elements.length;
+    
+    if (leaderNickname === null)
+    {
+        playerList.removeChild(elements[0]);
+    }
+    else
+    {
+        if (length > 0)
+        {
+            playerList.removeChild(elements[0]);
+            playerList.removeChild(elements[0]);
+
+            let b = document.createElement("b");
+            b.appendChild(document.createTextNode(`${leaderNickname} (Leader)`));
+    
+            let li = document.createElement("li");
+            li.appendChild(b);
+            li.setAttribute("class", "list-group-item");
+            li.setAttribute("id", "leader");
+    
+            playerList.prepend(li);
+        }
+        else
+        {
+            let b = document.createElement("b");
+            b.appendChild(document.createTextNode(`${leaderNickname} (Leader)`));
+    
+            let li = document.createElement("li");
+            li.appendChild(b);
+            li.setAttribute("class", "list-group-item");
+            li.setAttribute("id", "leader");
+    
+            playerList.prepend(li);
+        }
+    }
+});
+
+socket.on('changeLobbyPlayer', oldPlayerNickname => {
+    let playerList = document.getElementById("player-list");
+    const elements = playerList.getElementsByTagName("li");
+    const length = elements.length;
+
+    for (let i = 0; i < length; i++)
+    {
+        if (elements[i].textContent === oldPlayerNickname)
+        {
+            playerList.removeChild(elements[i]);
+            break;
+        }
+    }
+});
+
+socket.on('changeLobbySpectator', oldSpectatorNickname => {
+    let spectatorList = document.getElementById("spectator-list");
+    const elements = spectatorList.getElementsByTagName("li");
+    const length = elements.length;
+
+    for (let i = 0; i < length; i++)
+    {
+        if (elements[i].textContent === oldSpectatorNickname)
+        {
+            spectatorList.removeChild(elements[i]);
+            break;
+        }
     }
 });
 
