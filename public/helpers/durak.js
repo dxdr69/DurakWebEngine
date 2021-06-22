@@ -84,56 +84,74 @@ class Durak extends Phaser.Scene {
     {
         const self = this;
 
-        this.isLeader = false;
-        this.myHand = [];
-
-        this.socket = io();
-
-        this.socket.on('connect', () => {
-            console.log('Client connected');
-            console.log(`Your ID is: ${self.socket.id}`);
-        });
-
-        this.socket.on('setLeader', () => {
-            self.isLeader = true;
-            console.log('You are currently the leader');
-        });
-
-        this.socket.on('newRoundPrep', () => {
-            this.socket.emit('newRoundPrep');
-        });
-
-        this.socket.on('firstTurnDealPrep', () => {
-            this.socket.emit('firstTurnDealPrep');
-        });
-
-        this.socket.on('firstTurnDeal', (playersInfo) => {
-            let opponentSprite = 'cardBack';
-    
-            playersInfo.forEach(player => {
-                if (player.id === self.socket.id)
-                {
-                    for (let i = 0; i < 6; i++)
-                    {
-                        let playerCard = new Card(self);
-                        playerCard.render(475 + (i * 100), 750, 'player', player.hand[i]);
-    
-                        let opponentCard = new Card(self);
-                        opponentCard.render(475 + (i * 100), 250, 'opponent', opponentSprite);
-                    }
-                    
-                    self.myHand = player.hand;
-                }
-            });
-            
-            console.log(`Hand for player with ID: ${self.socket.id} // ${self.myHand}`);
-        });
 
         this.add.image(960, 540, 'background');
 
         this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
             gameObject.x = dragX;
             gameObject.y = dragY;
+        });
+
+
+        this.currentLeaderID = null;        
+        this.myHand = [];
+
+
+        this.socket = io();
+
+        this.socket.on('connect', () => {
+            console.log('Client connected');
+            console.log(`Your ID is: ${self.socket.id}`);
+            this.socket.emit('setRedirectLeader');
+        });
+
+        this.socket.on('setRedirectLeader', currentLeaderID => {
+            self.currentLeaderID = currentLeaderID;
+            console.log(`The ID of the leader is: ${self.currentLeaderID}`);
+        });
+
+        this.socket.on('newRoundPrep', () => {
+            this.socket.emit('newRoundPrep');
+        });
+
+        this.socket.on('firstTurnDealPrep', userType => {
+            this.socket.emit('firstTurnDealPrep', userType);
+        });
+
+        this.socket.on('firstTurnDeal', (userType, playersInfo) => {
+            const opponentSprite = 'cardBack';
+
+            if (userType === 'player')
+            {
+                playersInfo.forEach(player => {
+                    if (player.id === self.socket.id)
+                    {
+                        for (let i = 0; i < 6; i++)
+                        {
+                            let playerCard = new Card(self);
+                            playerCard.render(475 + (i * 100), 750, 'player', player.hand[i]);
+        
+                            let opponentCard = new Card(self);
+                            opponentCard.render(475 + (i * 100), 250, 'opponent', opponentSprite);
+                        }
+                        
+                        self.myHand = player.hand;
+                    }
+                });
+                
+                console.log(`Hand for player with ID: ${self.socket.id} // ${self.myHand}`);
+            }
+            else
+            {
+                for (let i = 0; i < 6; i++)
+                {
+                    let card = new Card(self);
+                    card.render(475 + (i * 100), 750, 'opponent', opponentSprite);
+
+                    let card2 = new Card(self);
+                    card2.render(475 + (i * 100), 250, 'opponent', opponentSprite);
+                }
+            }
         });
     }
 

@@ -9,16 +9,24 @@ const spectatorForm = document.getElementById("spectator-buttons");
 
 playerForm.addEventListener('submit', e => {
     e.preventDefault();
+    e.stopPropagation();
+
     
+    const playerListLength = document.getElementById("player-list")
+                             .getElementsByTagName("li").length;
+
     if (socket.id === currentLeaderID)
     {
-        if (e.target.id === 'btn-start-round')
+        if (document.activeElement.id === 'btn-start-round' && playerListLength > 1)
         {
-            return false;
+            socket.emit('lobbyRedirect');
         }
         else
         {
-            socket.emit('changeLeaderToSpectator');
+            if (document.activeElement.id === 'btn-become-spectator')
+            {
+                socket.emit('changeLeaderToSpectator');
+            }
         }
     }
     else
@@ -30,8 +38,8 @@ playerForm.addEventListener('submit', e => {
 spectatorForm.addEventListener('submit', e => {
     e.preventDefault();
 
-    let playerList = document.getElementById("player-list");
-    const playerListLength = playerList.getElementsByTagName("li").length;
+    const playerListLength = document.getElementById("player-list")
+                             .getElementsByTagName("li").length;
 
     if (playerListLength === 4)
     {
@@ -400,4 +408,12 @@ socket.on('joinLobby', (userType, playerNicknames, spectatorNicknames, currentLe
             }
         }
     }
+});
+
+socket.on('removeLobbyMenus', () => {
+    document.body.innerHTML = '';
+});
+
+socket.on('lobbyRedirect', destination => {
+    window.location.href = destination;
 });

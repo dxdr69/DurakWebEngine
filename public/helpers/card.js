@@ -2,8 +2,8 @@
 class Card {
     constructor(scene)
     {
-        this.render = (x, y, playerOrOpponentCard, sprite) => {
-            if (playerOrOpponentCard === 'player')
+        this.render = (x, y, cardType, sprite) => {
+            if (cardType === 'player')
             {
                 let card = scene.add.image(x, y, sprite).setScale(0.25, 0.25).setInteractive();
                 scene.input.setDraggable(card);
@@ -11,7 +11,7 @@ class Card {
             }
             else
             {
-                if (playerOrOpponentCard === 'opponent')
+                if (cardType === 'opponent')
                 {
                     let card = scene.add.image(x, y, sprite).setScale(0.25, 0.25);
                     return card;
