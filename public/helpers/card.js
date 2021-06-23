@@ -5,7 +5,7 @@ class Card {
         this.render = (x, y, cardType, sprite) => {
             if (cardType === 'player')
             {
-                let card = scene.add.image(x, y, sprite).setScale(0.25, 0.25).setInteractive();
+                let card = scene.add.image(x, y, sprite).setScale(0.22, 0.22).setInteractive();
                 scene.input.setDraggable(card);
                 return card;
             }
@@ -13,11 +13,11 @@ class Card {
             {
                 if (cardType === 'opponent')
                 {
-                    let card = scene.add.image(x, y, sprite).setScale(0.25, 0.25);
+                    let card = scene.add.image(x, y, sprite).setScale(0.22, 0.22);
+                    card.angle = 0;
                     return card;
                 }
             }
-
         }
     }
 }

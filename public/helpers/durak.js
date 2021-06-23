@@ -84,6 +84,14 @@ class Durak extends Phaser.Scene {
     {
         const self = this;
 
+        this.numPlayers = null;
+        this.currentLeaderID = null;
+
+        this.player1Hand = [];
+        this.player2Hand = [];
+        this.player3Hand = [];
+        this.player4Hand = [];
+
 
         this.add.image(960, 540, 'background');
 
@@ -91,10 +99,6 @@ class Durak extends Phaser.Scene {
             gameObject.x = dragX;
             gameObject.y = dragY;
         });
-
-
-        this.currentLeaderID = null;        
-        this.myHand = [];
 
 
         this.socket = io();
@@ -114,7 +118,8 @@ class Durak extends Phaser.Scene {
             this.socket.emit('newRoundPrep');
         });
 
-        this.socket.on('firstTurnDealPrep', userType => {
+        this.socket.on('firstTurnDealPrep', (userType, numPlayers) => {
+            self.numPlayers = numPlayers;
             this.socket.emit('firstTurnDealPrep', userType);
         });
 
@@ -128,28 +133,104 @@ class Durak extends Phaser.Scene {
                     {
                         for (let i = 0; i < 6; i++)
                         {
-                            let playerCard = new Card(self);
-                            playerCard.render(475 + (i * 100), 750, 'player', player.hand[i]);
-        
-                            let opponentCard = new Card(self);
-                            opponentCard.render(475 + (i * 100), 250, 'opponent', opponentSprite);
+                            if (self.numPlayers === 4)
+                            {
+                                let player1Card = new Card(self);
+                                self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', player.hand[i]));
+            
+                                let player2Card = new Card(self);
+                                self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
+
+                                let player3Card = new Card(self);
+                                self.player3Hand.push(player3Card.render(180, 280 + (i * 100), 'opponent', opponentSprite));
+
+                                self.player3Hand.forEach(card => {
+                                    card.angle = -90;
+                                });
+                                
+                                let player4Card = new Card(self);
+                                self.player4Hand.push(player4Card.render(1600, 280 + (i * 100), 'opponent', opponentSprite));
+
+                                self.player4Hand.forEach(card => {
+                                    card.angle = -90;
+                                });
+                            }
+                            else if (self.numPlayers === 3)
+                            {
+                                let player1Card = new Card(self);
+                                self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', player.hand[i]));
+            
+                                let player2Card = new Card(self);
+                                self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
+
+                                let player3Card = new Card(self);
+                                self.player3Hand.push(player3Card.render(180, 280 + (i * 100), 'opponent', opponentSprite));
+
+                                self.player3Hand.forEach(card => {
+                                    card.angle = -90;
+                                });
+                            }
+                            else
+                            {
+                                let player1Card = new Card(self);
+                                self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', player.hand[i]));
+            
+                                let player2Card = new Card(self);
+                                self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
+                            }
                         }
-                        
-                        self.myHand = player.hand;
                     }
                 });
-                
-                console.log(`Hand for player with ID: ${self.socket.id} // ${self.myHand}`);
             }
             else
             {
                 for (let i = 0; i < 6; i++)
                 {
-                    let card = new Card(self);
-                    card.render(475 + (i * 100), 750, 'opponent', opponentSprite);
+                    if (self.numPlayers === 4)
+                    {
+                        let player1Card = new Card(self);
+                        self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', opponentSprite));
+    
+                        let player2Card = new Card(self);
+                        self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
 
-                    let card2 = new Card(self);
-                    card2.render(475 + (i * 100), 250, 'opponent', opponentSprite);
+                        let player3Card = new Card(self);
+                        self.player3Hand.push(player3Card.render(180, 280 + (i * 100), 'opponent', opponentSprite));
+
+                        self.player3Hand.forEach(card => {
+                            card.angle = -90;
+                        });
+                        
+                        let player4Card = new Card(self);
+                        self.player4Hand.push(player4Card.render(1600, 280 + (i * 100), 'opponent', opponentSprite));
+
+                        self.player4Hand.forEach(card => {
+                            card.angle = -90;
+                        });
+                    }
+                    else if (self.numPlayers === 3)
+                    {
+                        let player1Card = new Card(self);
+                        self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', opponentSprite));
+    
+                        let player2Card = new Card(self);
+                        self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
+
+                        let player3Card = new Card(self);
+                        self.player3Hand.push(player3Card.render(180, 280 + (i * 100), 'opponent', opponentSprite));
+
+                        self.player3Hand.forEach(card => {
+                            card.angle = -90;
+                        });
+                    }
+                    else
+                    {
+                        let player1Card = new Card(self);
+                        self.player1Hand.push(player1Card.render(650 + (i * 100), 920, 'player', opponentSprite));
+    
+                        let player2Card = new Card(self);
+                        self.player2Hand.push(player2Card.render(650 + (i * 100), 160, 'opponent', opponentSprite));
+                    }
                 }
             }
         });

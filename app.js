@@ -374,11 +374,11 @@ io.on('connection', (socket) => {
 
         setTimeout(() => {
             socket.to(playerRoom).emit('lobbyRedirect', destination);
-        }, 5000);
+        }, 3000);
 
         setTimeout(() => {
             io.in(spectatorRoom).emit('lobbyRedirect', destination);
-        }, 6000);
+        }, 5000);
     });
 
     socket.on('setRedirectLeader', () => {
@@ -405,10 +405,25 @@ io.on('connection', (socket) => {
 
         const trumpSuit = theDealer.setTrumpSuit();
 
-        console.log(`Trump suit for this round is: ${trumpSuit}`);
+        switch(trumpSuit) {
+            case 'C':
+                console.log('Trump suit for this round is: Club');
+                break;
+            case 'D':
+                console.log('Trump suit for this round is: Diamond');
+                break;
+            case 'H':
+                console.log('Trump suit for this round is: Heart');
+                break;
+            case 'S':
+                console.log('Trump suit for this round is: Spade');
+                break;
+            default:
+                break;
+        }
 
-        io.in(playerRoom).emit('firstTurnDealPrep', 'player');
-        io.in(spectatorRoom).emit('firstTurnDealPrep', 'spectator');
+        io.in(playerRoom).emit('firstTurnDealPrep', 'player', players.length);
+        io.in(spectatorRoom).emit('firstTurnDealPrep', 'spectator', players.length);
     });
 
     socket.on('firstTurnDealPrep', userType => {
@@ -419,14 +434,7 @@ io.on('connection', (socket) => {
             playersInfo.push( { "id": players[i].id, "hand": players[i].hand } );
         }
 
-        if (userType === 'player')
-        {
-            io.to(socket.id).emit('firstTurnDeal', userType, playersInfo);
-        }
-        else
-        {
-            io.to(socket.id).emit('firstTurnDeal', userType, playersInfo);
-        }
+        io.to(socket.id).emit('firstTurnDeal', userType, playersInfo);
     });
 
     socket.on('disconnect', () => {
@@ -491,6 +499,10 @@ io.on('connection', (socket) => {
             {
                 console.log('All users disconnected');
             }
+        }
+        else
+        {
+            // If user disconnects during a match
         }
     });
 });
