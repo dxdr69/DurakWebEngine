@@ -3,9 +3,18 @@
 const socket = io();
 
 let currentLeaderID = null;
+let freezeClick = false;
 
 const playerForm = document.getElementById("player-buttons");
 const spectatorForm = document.getElementById("spectator-buttons");
+
+document.addEventListener("click", e => {
+    if (freezeClick)
+    {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+}, true);
 
 playerForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -411,7 +420,12 @@ socket.on('joinLobby', (userType, playerNicknames, spectatorNicknames, currentLe
 });
 
 socket.on('removeLobbyMenus', () => {
-    document.body.innerHTML = '';
+    freezeClick = true;
+
+    document.body.innerHTML = `<div class="alert alert-success" role="alert">
+                                <h4 class="alert-heading">A new round of Durak has been started</h4>
+                                <p>Please wait while you are redirected to the game...</p>
+                               </div>`;
 });
 
 socket.on('lobbyRedirect', destination => {

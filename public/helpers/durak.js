@@ -14,6 +14,7 @@ class Durak extends Phaser.Scene {
 
         this.load.image('cardBack', 'assets/back.png')
 
+        /*
         this.load.image('2C', 'assets/2C.png');
         this.load.image('2D', 'assets/2D.png');
         this.load.image('2H', 'assets/2H.png');
@@ -33,6 +34,7 @@ class Durak extends Phaser.Scene {
         this.load.image('5D', 'assets/5D.png');
         this.load.image('5H', 'assets/5H.png');
         this.load.image('5S', 'assets/5S.png');
+        */
 
         this.load.image('6C', 'assets/6C.png');
         this.load.image('6D', 'assets/6D.png');
@@ -106,7 +108,14 @@ class Durak extends Phaser.Scene {
         this.socket.on('connect', () => {
             console.log('Client connected');
             console.log(`Your ID is: ${self.socket.id}`);
-            this.socket.emit('setRedirectLeader');
+        });
+
+        this.socket.on('setRedirectUser', () => {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            const userType = urlParams.get('userType');
+            const nickname = urlParams.get('nickname');
+            this.socket.emit('setRedirectUser', userType, nickname);
         });
 
         this.socket.on('setRedirectLeader', currentLeaderID => {

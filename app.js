@@ -19,13 +19,10 @@ let nicknames = [];
 let players = [];
 let spectators = [];
 
-let redirectNicknames = [[], []];
-let redirectPlayerTotal = null;
-let redirectPlayerCount = null;
-let redirectSpectatorTotal = null;
+let currentLeader = null;
 
 let roundInProgress = false;
-let currentLeader = null;
+let redirectUserTotal = null;
 
 
 
@@ -45,7 +42,7 @@ app.get('/lobby', (req, res) => {
 
 app.get('/game', (req, res) => {
     res.render('game');
-})
+});
 
 app.post('/join', (req, res) => {
     const nickname = encodeURIComponent(req.body.nickname);
@@ -55,14 +52,14 @@ app.post('/join', (req, res) => {
 
 
 io.on('connection', (socket) => {
-    console.log(`New user connected: ${socket.id}`);
-
     const lobbyRoom = 'lobby';
     const playerRoom = 'players';
     const spectatorRoom = 'spectators';
 
     if (roundInProgress === false)
     {
+        console.log(`New user connected: ${socket.id}`);
+
         if (players.length === 0)
         {
             socket.join(lobbyRoom);
@@ -84,6 +81,8 @@ io.on('connection', (socket) => {
             };
 
             console.log(`User with ID of: ${currentLeader.id} has been set as leader`);
+            console.log(`User with ID of: ${currentLeader.id} has been given nickname: ${currentLeader.nickname}`);
+
             io.to(currentLeader.id).emit('changeLeaderID', currentLeader.id);
             io.to(currentLeader.id).emit('setLobbyLeader', 'leader', currentLeader.nickname);
             
@@ -112,9 +111,10 @@ io.on('connection', (socket) => {
 
             players.push(player);
 
+            console.log(`User with ID of: ${socket.id} has been given nickname: ${player.nickname}`);
+
             io.to(socket.id).emit('changeLeaderID', currentLeader.id);
             io.to(socket.id).emit('setLobbyLeader', 'player', currentLeader.nickname);
-
 
             let playerNicknames = [];
 
@@ -147,9 +147,10 @@ io.on('connection', (socket) => {
 
             spectators.push(spectator);
 
+            console.log(`User with ID of: ${socket.id} has been given nickname: ${spectator.nickname}`);
+
             io.to(socket.id).emit('changeLeaderID', currentLeader.id);
             io.to(socket.id).emit('setLobbyLeader', 'spectator', currentLeader.nickname);
-
 
             let playerNicknames = [];
 
@@ -167,53 +168,8 @@ io.on('connection', (socket) => {
     }
     else
     {
-        if (players.length === 0)
-        {
-            socket.join(playerRoom);
-            console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
-
-            const player = {
-                id: socket.id,
-                isLeader: true,
-                nickname: redirectNicknames[0].splice(0,1)[0],
-                hand: []
-            };
-
-            players.push(player);
-
-            currentLeader = {
-                id: player.id,
-                nickname: player.nickname
-            };
-
-            console.log(`User with ID of: ${currentLeader.id} has been set as leader`);
-        }
-        else if (players.length >= 1 && players.length < redirectPlayerTotal)
-        {
-            socket.join(playerRoom);
-            console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
-
-            const player = {
-                id: socket.id,
-                isLeader: false,
-                nickname: redirectNicknames[0].splice(0,1)[0],
-                hand: []
-            };
-
-            players.push(player);
-        }
-        else
-        {
-            socket.join(spectatorRoom);
-            console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
-
-            const spectator = {
-                id: socket.id,
-                nickname: redirectNicknames[1].splice(0,1)[0]
-            };
-
-            spectators.push(spectator);
-        }
+        console.log(`New redirected user connected: ${socket.id}`);
+        io.to(socket.id).emit('setRedirectUser');
     }
     
     socket.on('changeLeaderToSpectator', () => {
@@ -344,53 +300,117 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('lobbyRedirect', () => {
+    socket.on('lobbyRedirect', async () => {
         roundInProgress = true;
+        redirectUserTotal = players.length + spectators.length;
+
         console.log(`New round of Durak started with ${players.length} player(s) and ${spectators.length} spectator(s)`);
+        console.log('Redirecting users to game...');
 
         io.in(lobbyRoom).emit('removeLobbyMenus');
-        
-        players.forEach(player => {
-            redirectNicknames[0].push(player.nickname);
-        });
 
-        if (spectators.length > 0)
-        {
-            spectators.forEach(spectator => {
-                redirectNicknames[1].push(spectator.nickname);
-            });
-        }
-
-        redirectPlayerTotal = players.length;
-        redirectPlayerCount = players.length;
-        redirectSpectatorTotal = spectators.length;
-
-        players = [];
-        spectators = [];
-        
         const destination = '/game';
 
-        io.to(currentLeader.id).emit('lobbyRedirect', destination);
-
-        setTimeout(() => {
-            socket.to(playerRoom).emit('lobbyRedirect', destination);
-        }, 3000);
-
-        setTimeout(() => {
-            io.in(spectatorRoom).emit('lobbyRedirect', destination);
-        }, 5000);
+        io.in(playerRoom).fetchSockets()
+           .then(playerSockets => {
+                  players.forEach(player => {
+                      for (const socket of playerSockets) 
+                      {
+                          if (socket.id === player.id && player.isLeader === true)
+                          {
+                              io.to(currentLeader.id).emit('lobbyRedirect', destination + `?userType=leader&nickname=${currentLeader.nickname}`);
+                          }
+                          else if (socket.id === player.id)
+                          {
+                              io.to(socket.id).emit('lobbyRedirect', destination + `?userType=player&nickname=${player.nickname}`);
+                          }
+                      }
+                  });
+            })
+           .then(async () => {
+                  if (spectators.length > 0)
+                  {
+                    io.in(spectatorRoom).fetchSockets()
+                       .then(spectatorSockets => {
+                              spectators.forEach(spectator => {
+                                  for (const socket of spectatorSockets) 
+                                  {
+                                      if (socket.id === spectator.id)
+                                      {
+                                          io.to(socket.id).emit('lobbyRedirect', destination + `?userType=spectator&nickname=${spectator.nickname}`);
+                                      }
+                                  }
+                              });
+                       })
+                  }
+           })
+           .catch(() => {
+               console.log('Error redirecting users to game');
+           });
     });
 
-    socket.on('setRedirectLeader', () => {
-        redirectPlayerCount -= 1;
+    socket.on('setRedirectUser', (userType, nickname) => {
+        redirectUserTotal -= 1;
 
-        if (redirectPlayerCount === (redirectSpectatorTotal * -1))
+        if (userType === 'leader')
         {
-            io.to(currentLeader.id).emit('newRoundPrep');
+            socket.join(playerRoom);
+            console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
+
+            const player = {
+                id: socket.id,
+                isLeader: true,
+                nickname: nickname,
+                hand: []
+            };
+
+            players.push(player);
+
+            currentLeader = {
+                id: player.id,
+                nickname: player.nickname
+            };
+
+            console.log(`User with ID of: ${currentLeader.id} has been set as leader`);
+            console.log(`User with ID of: ${currentLeader.id} has been given nickname: ${currentLeader.nickname}`);
+        }
+        else if (userType === 'player')
+        {
+            socket.join(playerRoom);
+            console.log(`User with ID: ${socket.id} joined room: ${playerRoom}`);
+
+            const player = {
+                id: socket.id,
+                isLeader: false,
+                nickname: nickname,
+                hand: []
+            };
+
+            players.push(player);
+
+            console.log(`User with ID of: ${socket.id} has been given nickname: ${player.nickname}`);
         }
         else
         {
-            io.to(socket.id).emit('setRedirectLeader', currentLeader.id);
+            socket.join(spectatorRoom);
+            console.log(`User with ID: ${socket.id} joined room: ${spectatorRoom}`);
+
+            const spectator = {
+                id: socket.id,
+                nickname: nickname
+            };
+
+            spectators.push(spectator);
+
+            console.log(`User with ID of: ${socket.id} has been given nickname: ${spectator.nickname}`);
+        }
+
+        if (redirectUserTotal === 0)
+        {
+            console.log('All users have been redirected to game');
+            io.to(playerRoom).emit('setRedirectLeader', currentLeader.id);
+            io.to(spectatorRoom).emit('setRedirectLeader', currentLeader.id);
+            io.to(currentLeader.id).emit('newRoundPrep');
         }
     });
 

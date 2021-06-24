@@ -3,6 +3,7 @@ module.exports = class Dealer {
     {
         this.deck = [];
 
+        /*
         this.deck.push('2C');
         this.deck.push('2D');
         this.deck.push('2H');
@@ -22,7 +23,8 @@ module.exports = class Dealer {
         this.deck.push('5D');
         this.deck.push('5H');
         this.deck.push('5S');
-
+        */
+       
         this.deck.push('6C');
         this.deck.push('6D');
         this.deck.push('6H');
@@ -130,6 +132,11 @@ module.exports = class Dealer {
         }
 
         this.trumpSuit = suit;
+        return this.trumpSuit;
+    }
+
+    getTrumpSuit()
+    {
         return this.trumpSuit;
     }
 }
