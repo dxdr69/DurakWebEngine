@@ -454,7 +454,10 @@ io.on('connection', (socket) => {
             playersInfo.push( { "id": players[i].id, "hand": players[i].hand } );
         }
 
-        io.to(socket.id).emit('firstTurnDeal', userType, playersInfo);
+        const deck = theDealer.getDeck();
+        const trumpCard = theDealer.getTrumpCard();
+
+        io.to(socket.id).emit('firstTurnDeal', userType, playersInfo, deck, trumpCard);
     });
 
     socket.on('disconnect', () => {
@@ -519,10 +522,6 @@ io.on('connection', (socket) => {
             {
                 console.log('All users disconnected');
             }
-        }
-        else
-        {
-            // If user disconnects during a match
         }
     });
 });

@@ -89,6 +89,7 @@ class Durak extends Phaser.Scene {
         this.numPlayers = null;
         this.currentLeaderID = null;
 
+        this.deck = [];
         this.player1Hand = [];
         this.player2Hand = [];
         this.player3Hand = [];
@@ -132,7 +133,7 @@ class Durak extends Phaser.Scene {
             this.socket.emit('firstTurnDealPrep', userType);
         });
 
-        this.socket.on('firstTurnDeal', (userType, playersInfo) => {
+        this.socket.on('firstTurnDeal', (userType, playersInfo, currentDeck, trumpCard) => {
             const opponentSprite = 'cardBack';
 
             if (userType === 'player')
@@ -242,6 +243,25 @@ class Durak extends Phaser.Scene {
                     }
                 }
             }
+
+            let bottomCard = new Card(self);
+            self.deck.push(bottomCard.render(990, 540, 'player', trumpCard));
+            self.deck[0].angle = -90;
+
+            for (let i = currentDeck.length-2; i >= 0; i--)
+            {
+                let deckCard = new Card (self);
+                self.deck.push(deckCard.render(960, 540, 'player', opponentSprite));
+            }
+
+            let unreverseDeck = [];
+
+            for (let i = currentDeck.length-1; i >= 0; i--)
+            {
+                unreverseDeck.push(self.deck[i]);
+            }
+
+            self.deck = unreverseDeck;
         });
     }
 

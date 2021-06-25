@@ -72,6 +72,7 @@ module.exports = class Dealer {
 
 
         this.deckInUse = this.deck;
+        this.trumpCard = null;
         this.trumpSuit = null;
     }
 
@@ -131,12 +132,17 @@ module.exports = class Dealer {
             }
         }
 
+        this.trumpCard = randomCard;
         this.trumpSuit = suit;
+
+        this.deckInUse.splice(this.deckInUse.indexOf(this.trumpCard), 1);
+        this.deckInUse.push(this.trumpCard);
+        
         return this.trumpSuit;
     }
 
-    getTrumpSuit()
+    getTrumpCard()
     {
-        return this.trumpSuit;
+        return this.trumpCard;
     }
 }
