@@ -20,7 +20,7 @@ let players = [];
 let spectators = [];
 
 let currentLeader = null;
-
+let usersRedirected = false;
 let roundInProgress = false;
 let redirectUserTotal = null;
 
@@ -407,6 +407,7 @@ io.on('connection', (socket) => {
 
         if (redirectUserTotal === 0)
         {
+            usersRedirected = true;
             console.log('All users have been redirected to game');
             io.to(playerRoom).emit('setRedirectLeader', currentLeader.id);
             io.to(spectatorRoom).emit('setRedirectLeader', currentLeader.id);
@@ -451,13 +452,18 @@ io.on('connection', (socket) => {
 
         for (let i = 0; i < players.length; i++)
         {
-            playersInfo.push( { "id": players[i].id, "hand": players[i].hand } );
+            playersInfo.push( { "id": players[i].id, "nickname": players[i].nickname, "hand": players[i].hand } );
         }
 
         const deck = theDealer.getDeck();
         const trumpCard = theDealer.getTrumpCard();
 
         io.to(socket.id).emit('firstTurnDeal', userType, playersInfo, deck, trumpCard);
+    });
+
+    socket.on('playZoneDrop', (playerID, cardName, posX, posY) => {
+        socket.to(playerRoom).emit('playZoneDrop', playerID, 'player', cardName, posX, posY)
+        io.in(spectatorRoom).emit('playZoneDrop', playerID, 'spectator', cardName, posX, posY);
     });
 
     socket.on('disconnect', () => {
