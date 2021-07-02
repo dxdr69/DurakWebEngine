@@ -91,7 +91,7 @@ class Durak extends Phaser.Scene {
 
         this.deck = [];
         this.playZoneCards = [];
-
+        
         this.player1Info = null;
         this.player2Info = null;
         this.player3Info = null;
@@ -106,11 +106,11 @@ class Durak extends Phaser.Scene {
         this.zone = new Zone(this);
         this.deckZone = this.zone.renderZone(180, 160, 280, 250);
         this.outline = this.zone.renderOutline(this.deckZone, 0xfc7703);
-
+        
         this.zone = new Zone(this);
         this.discardZone = this.zone.renderZone(1720, 160, 250, 250);
         this.outline = this.zone.renderOutline(this.discardZone, 0xff1717);
-
+        
         this.zone = new Zone(this);
         this.player1Zone = this.zone.renderZone(960, 920, 815, 250);
         this.outline = this.zone.renderOutline(this.player1Zone, 0x17da00);
@@ -121,6 +121,23 @@ class Durak extends Phaser.Scene {
 
         this.player3Zone = null;
         this.player4Zone = null;
+
+        this.player1NameText = null;
+        this.player1CardText = null;
+
+        this.player2NameText = null;
+        this.player2CardText = null;
+
+        this.player3NameText = null;
+        this.player3CardText = null;
+
+        this.player4NameText = null;
+        this.player4CardText = null;
+
+        this.leaderEndGameText = null;
+        this.leaderAnotherRoundText = null;
+
+
 
         this.input.on('dragstart', (pointer, gameObject) => {
             self.children.bringToTop(gameObject);
@@ -142,26 +159,70 @@ class Durak extends Phaser.Scene {
         this.input.on('drop', (pointer, gameObject, dropZone) => {
             if (dropZone === this.playZone)
             {
-                if (this.playZone.data.values.cards === 6)
+                if (this.playZoneCards.includes(gameObject) || gameObject.texture.key === 'cardBack')
                 {
-                    gameObject.x = gameObject.input.dragStartX;
-                    gameObject.y = gameObject.input.dragStartY;
+                    return;
                 }
                 else
                 {
-                    gameObject.input.enabled = false;
                     this.playZoneCards.push(gameObject);
-                    const cardName = gameObject.texture.key;
+                    this.player1Info.hand.splice(this.player1Info.hand.indexOf(gameObject), 1);
+                    this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
                     const posX = gameObject.x;
                     const posY = gameObject.y;
-                    this.socket.emit('playZoneDrop', self.socket.id, cardName, posX, posY);
+                    const cardKey = gameObject.texture.key;
+                    this.socket.emit('playZoneDrop', self.socket.id, cardKey, posX, posY);
+                }
+            }
+            else if (dropZone === this.discardZone)
+            {
+                if (gameObject.texture.key === 'cardBack')
+                {
+                    return;
+                }
+                else
+                {
+                    this.playZoneCards.splice(this.playZoneCards.indexOf(gameObject), 1);
+                    const cardKey = gameObject.texture.key;
+                    gameObject.destroy();
+                    this.socket.emit('cardDiscarded', cardKey);
+                }
+            }
+            else if (dropZone === this.player1Zone)
+            {
+                if (gameObject.texture.key === 'cardBack')
+                {
+                    const drawnCardKey = self.deck.shift().name;
+                    gameObject.setTexture(drawnCardKey);
+                    this.player1Info.hand.push(gameObject);
+                    this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                    this.socket.emit('cardDrawn', self.socket.id, null);
+                }
+                else if (self.deck.length === 1)
+                {
+                    self.deck.shift();
+                    gameObject.setAngle(0);
+                    this.player1Info.hand.push(gameObject);
+                    this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                    this.socket.emit('cardDrawn', self.socket.id, null);
+                }
+                else
+                {
+                    if (this.player1Info.hand.includes(gameObject))
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        this.player1Info.hand.push(gameObject);
+                        this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                        const drawnCardKey = gameObject.texture.key;
+                        this.socket.emit('cardDrawn', self.socket.id, drawnCardKey);
+                    }
                 }
             }
         });
 
-        this.discardZone.on('drop', (pointer, gameObject) => {
-            //gameObject.destroy();
-        });
 
 
 
@@ -255,7 +316,7 @@ class Durak extends Phaser.Scene {
             {
                 self.player3Info = {
                     id: playersInfoCopy[0].id,
-                    nickname: playersInfoCopy[0].id,
+                    nickname: playersInfoCopy[0].nickname,
                     hand: []
                 };
 
@@ -273,7 +334,7 @@ class Durak extends Phaser.Scene {
             {
                 self.player3Info = {
                     id: playersInfoCopy[0].id,
-                    nickname: playersInfoCopy[0].id,
+                    nickname: playersInfoCopy[0].nickname,
                     hand: []
                 };
 
@@ -289,50 +350,42 @@ class Durak extends Phaser.Scene {
                     {
                         for (let i = 0; i < 6; i++)
                         {
+                            let player1Card = new Card(self);
+                            self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'player', player.hand[i]));
+        
+                            let player2Card = new Card(self);
+                            self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
+
                             if (self.numPlayers === 4)
                             {
-                                let player1Card = new Card(self);
-                                self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'player', player.hand[i]));
-            
-                                let player2Card = new Card(self);
-                                self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
-
                                 let player3Card = new Card(self);
                                 self.player3Info.hand.push(player3Card.render(180, 480 + (i * 100), 'opponent', opponentSprite));
-
-                                self.player3Info.hand.forEach(card => {
-                                    card.angle = -90;
-                                });
                                 
                                 let player4Card = new Card(self);
                                 self.player4Info.hand.push(player4Card.render(1720, 480 + (i * 100), 'opponent', opponentSprite));
 
-                                self.player4Info.hand.forEach(card => {
-                                    card.angle = -90;
-                                });
+                                if (i === 5)
+                                {
+                                    self.player3Info.hand.forEach(card => {
+                                        card.angle = -90;
+                                    });
+
+                                    self.player4Info.hand.forEach(card => {
+                                        card.angle = -90;
+                                    });
+                                }
                             }
                             else if (self.numPlayers === 3)
                             {
-                                let player1Card = new Card(self);
-                                self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'player', player.hand[i]));
-            
-                                let player2Card = new Card(self);
-                                self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
-
                                 let player3Card = new Card(self);
                                 self.player3Info.hand.push(player3Card.render(180, 480 + (i * 100), 'opponent', opponentSprite));
 
-                                self.player3Info.hand.forEach(card => {
-                                    card.angle = -90;
-                                });
-                            }
-                            else
-                            {
-                                let player1Card = new Card(self);
-                                self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'player', player.hand[i]));
-            
-                                let player2Card = new Card(self);
-                                self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
+                                if (i === 5)
+                                {
+                                    self.player3Info.hand.forEach(card => {
+                                        card.angle = -90;
+                                    });
+                                }
                             }
                         }
                     }
@@ -342,50 +395,42 @@ class Durak extends Phaser.Scene {
             {
                 for (let i = 0; i < 6; i++)
                 {
+                    let player1Card = new Card(self);
+                    self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'opponent', opponentSprite));
+
+                    let player2Card = new Card(self);
+                    self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
+
                     if (self.numPlayers === 4)
                     {
-                        let player1Card = new Card(self);
-                        self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'opponent', opponentSprite));
-    
-                        let player2Card = new Card(self);
-                        self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
-
                         let player3Card = new Card(self);
                         self.player3Info.hand.push(player3Card.render(180, 480 + (i * 100), 'opponent', opponentSprite));
-
-                        self.player3Info.hand.forEach(card => {
-                            card.angle = -90;
-                        });
                         
                         let player4Card = new Card(self);
                         self.player4Info.hand.push(player4Card.render(1720, 480 + (i * 100), 'opponent', opponentSprite));
 
-                        self.player4Info.hand.forEach(card => {
-                            card.angle = -90;
-                        });
+                        if (i === 5)
+                        {
+                            self.player3Info.hand.forEach(card => {
+                                card.angle = -90;
+                            });
+
+                            self.player4Info.hand.forEach(card => {
+                                card.angle = -90;
+                            });
+                        }
                     }
                     else if (self.numPlayers === 3)
                     {
-                        let player1Card = new Card(self);
-                        self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'opponent', opponentSprite));
-    
-                        let player2Card = new Card(self);
-                        self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
-
                         let player3Card = new Card(self);
                         self.player3Info.hand.push(player3Card.render(180, 480 + (i * 100), 'opponent', opponentSprite));
 
-                        self.player3Info.hand.forEach(card => {
-                            card.angle = -90;
-                        });
-                    }
-                    else
-                    {
-                        let player1Card = new Card(self);
-                        self.player1Info.hand.push(player1Card.render(700 + (i * 100), 920, 'opponent', opponentSprite));
-    
-                        let player2Card = new Card(self);
-                        self.player2Info.hand.push(player2Card.render(700 + (i * 100), 160, 'opponent', opponentSprite));
+                        if (i === 5)
+                        {
+                            self.player3Info.hand.forEach(card => {
+                                card.angle = -90;
+                            });
+                        }
                     }
                 }
             }
@@ -393,18 +438,17 @@ class Durak extends Phaser.Scene {
             if (userType === 'player')
             {
                 let bottomCard = new Card(self);
-                self.deck.push(bottomCard.render(160, 160, 'player', trumpCard));
-                self.deck[0].angle = -90;
+                self.deck.push(bottomCard.render(160, 160, 'player', trumpCard).setAngle(-90).setName(trumpCard));
     
                 for (let i = currentDeck.length-2; i >= 0; i--)
                 {
                     let deckCard = new Card (self);
-                    self.deck.push(deckCard.render(180, 160, 'player', opponentSprite));
+                    self.deck.push(deckCard.render(180, 160, 'player', opponentSprite).setName(currentDeck[i]));
                 }
     
                 let unreverseDeck = [];
     
-                for (let i = currentDeck.length-1; i >= 0; i--)
+                for (let i = self.deck.length-1; i >= 0; i--)
                 {
                     unreverseDeck.push(self.deck[i]);
                 }
@@ -414,112 +458,316 @@ class Durak extends Phaser.Scene {
             else
             {
                 let bottomCard = new Card(self);
-                self.deck.push(bottomCard.render(160, 160, 'opponent', trumpCard));
-                self.deck[0].angle = -90;
+                self.deck.push(bottomCard.render(160, 160, 'opponent', trumpCard).setAngle(-90).setName(trumpCard));
     
                 for (let i = currentDeck.length-2; i >= 0; i--)
                 {
                     let deckCard = new Card (self);
-                    self.deck.push(deckCard.render(180, 160, 'opponent', opponentSprite));
+                    self.deck.push(deckCard.render(180, 160, 'opponent', opponentSprite).setName(currentDeck[i]));
                 }
     
                 let unreverseDeck = [];
     
-                for (let i = currentDeck.length-1; i >= 0; i--)
+                for (let i = self.deck.length-1; i >= 0; i--)
                 {
                     unreverseDeck.push(self.deck[i]);
                 }
     
                 self.deck = Array.from(unreverseDeck);
+            }
+
+            let text = new Text(self);
+            self.player1NameText = text.renderText(710, 770, [`${self.player1Info.nickname}`], false);
+            self.player1CardText = text.renderText(1100, 770, [`Cards: ${self.player1Info.hand.length}`], false);
+
+            self.player2NameText = text.renderText(710, 300, [`${self.player2Info.nickname}`], false);
+            self.player2CardText = text.renderText(1100, 300, [`Cards: ${self.player2Info.hand.length}`], false);
+
+            if (self.numPlayers === 3)
+            {
+                self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
+                self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
+            }
+            else if (self.numPlayers === 4)
+            {
+                self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
+                self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
+
+                self.player4NameText = text.renderText(1530, 445, [`${self.player4Info.nickname}`], false);
+                self.player4CardText = text.renderText(1530, 460, [`Cards: ${self.player4Info.hand.length}`], false);
+            }
+
+            if (self.socket.id === self.currentLeaderID)
+            {
+                self.leaderAnotherRoundText = text.renderText(325, 250, ['Start another round'], true);
+                self.leaderEndGameText = text.renderText(325, 265, ['End session'], true);
             }
         });
 
-        this.socket.on('playZoneDrop', (playerID, userType, cardName, posX, posY) => {
+        this.socket.on('playZoneDrop', (playerID, userType, cardKey, posX, posY) => { 
             if (userType === 'player')
             {
-                if (self.numPlayers === 4)
+                if (self.player2Info.id === playerID)
                 {
-                    if (self.player2Info.id === playerID)
-                    {
-                        self.player2Info.hand[0].setVisible(false);
-                    }
-                    else if (self.player3Info.id === playerID)
-                    {
-                        self.player3Info.hand[0].setVisible(false);                        
-                    }
-                    else
-                    {
-                        self.player4Info.hand[0].setVisible(false);                        
-                    }
-                }
-                else if (self.numPlayers === 3)
-                {
-                    if (self.player2Info.id === playerID)
-                    {
-                        self.player2Info.hand[0].setVisible(false);
-                    }
-                    else
-                    {
-                        self.player3Info.hand[0].setVisible(false);
-                    }
+                    const card = self.player2Info.hand.splice(0,1)[0].setX(posX).setY(posY).
+                                                       setAngle(0).setTexture(cardKey).setInteractive();
+                    self.playZoneCards.push(card);                                   
+                    self.children.bringToTop(card);
+                    self.input.setDraggable(card);
+                    self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
                 }
                 else
                 {
-    
-                    self.player2Info.hand[0].setVisible(false);
+                    if (self.numPlayers === 4)
+                    {
+                        if (self.player3Info.id === playerID)
+                        {
+                            
+                            const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).
+                                                               setAngle(0).setTexture(cardKey).setInteractive();
+                            self.playZoneCards.push(card);                                   
+                            self.children.bringToTop(card);
+                            self.input.setDraggable(card);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);                     
+                        }
+                        else
+                        {
+                            const card = self.player4Info.hand.splice(0,1)[0].setX(posX).setY(posY).
+                                                               setAngle(0).setTexture(cardKey).setInteractive();
+                            self.playZoneCards.push(card);                                   
+                            self.children.bringToTop(card);
+                            self.input.setDraggable(card);
+                            self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);                       
+                        }
+                    }
+                    else
+                    {
+                        const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).
+                                                           setAngle(0).setTexture(cardKey).setInteractive();
+                        self.playZoneCards.push(card);                                   
+                        self.children.bringToTop(card);
+                        self.input.setDraggable(card);
+                        self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);      
+                    }
                 }
             }
             else
             {
-                if (self.numPlayers === 4)
+                if (self.player1Info.id === playerID)
                 {
-                    if (self.player1Info.id === playerID)
+                    const card = self.player1Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                    self.children.bringToTop(card);
+                    self.player1CardText.setText([`Cards: ${self.player1Info.hand.length}`]);      
+                }
+                else if (self.player2Info.id === playerID)
+                {
+                    const card = self.player2Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                    self.children.bringToTop(card);
+                    self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
+                }
+                else
+                {
+                    if (self.numPlayers === 4)
                     {
-                        self.player1Info.hand[0].setVisible(false);
-                    }
-                    else if (self.player2Info.id === playerID)
-                    {
-                        self.player2Info.hand[0].setVisible(false);
-                    }
-                    else if (self.player3Info.id === playerID)
-                    {
-                        self.player3Info.hand[0].setVisible(false);
+                        if (self.player3Info.id === playerID)
+                        {
+                            const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                            self.children.bringToTop(card);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                        }
+                        else
+                        {
+                            const card = self.player4Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                            self.children.bringToTop(card);
+                            self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
+                        }
                     }
                     else
                     {
-                        self.player4Info.hand[0].setVisible(false);
+                        const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                        self.children.bringToTop(card);
+                        self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
                     }
                 }
-                else if (self.numPlayers === 3)
+            }
+        });
+
+        this.socket.on('cardDiscarded', cardKey => {
+            for (let i = 0; i < self.playZoneCards.length; i++)
+            {
+                if (self.playZoneCards[i].texture.key === cardKey)
                 {
-                    if (self.player1Info.id === playerID)
+                    self.playZoneCards[i].destroy();
+                }
+            }
+        });
+
+        this.socket.on('cardDrawn', (userType, playerID, drawnCardKey) => {
+            if (drawnCardKey === null)
+            {
+                if (userType === 'player')
+                {
+                    const drawnCard = self.deck.shift();
+    
+                    if (self.player2Info.id === playerID)
                     {
-                        self.player1Info.hand[0].setVisible(false);
-                    }
-                    else if (self.player2Info.id === playerID)
-                    {
-                        self.player2Info.hand[0].setVisible(false);
+                        drawnCard.setX(700).setY(160).disableInteractive();
+                        self.player2Info.hand.push(drawnCard);
+                        self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
                     }
                     else
                     {
-                        self.player3Info.hand[0].setVisible(false);
+                        if (self.numPlayers === 4)
+                        {
+                            if (self.player3Info.id === playerID)
+                            {
+                                drawnCard.setX(180).setY(480).setAngle(-90).disableInteractive();
+                                self.player3Info.hand.push(drawnCard);
+                                self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                            }
+                            else
+                            {
+                                drawnCard.setX(1720).setY(480).setAngle(-90).disableInteractive();
+                                self.player4Info.hand.push(drawnCard);
+                                self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
+                            }
+                        }
+                        else
+                        {
+                            drawnCard.setX(180).setY(480).setAngle(-90).disableInteractive();
+                            self.player3Info.hand.push(drawnCard);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                        }
+                    }
+                }
+                else
+                {
+                    const drawnCard = self.deck.shift();
+    
+                    if (self.player1Info.id === playerID)
+                    {
+                        drawnCard.setX(700).setY(920).disableInteractive();
+                        self.player1Info.hand.push(drawnCard);
+                        self.player1CardText.setText([`Cards: ${self.player1Info.hand.length}`]);
+                    }
+                    else if (self.player2Info.id === playerID)
+                    {
+                        drawnCard.setX(700).setY(160).disableInteractive();
+                        self.player2Info.hand.push(drawnCard);
+                        self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
+                    }
+                    else
+                    {
+                        if (self.numPlayers === 4)
+                        {
+                            if (self.player3Info.id === playerID)
+                            {
+                                drawnCard.setX(180).setY(480).setAngle(-90).disableInteractive();
+                                self.player3Info.hand.push(drawnCard);
+                                self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                            }
+                            else
+                            {
+                                drawnCard.setX(1720).setY(480).setAngle(-90).disableInteractive();
+                                self.player4Info.hand.push(drawnCard);
+                                self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
+                            }
+                        }
+                        else
+                        {
+                            drawnCard.setX(180).setY(480).setAngle(-90).disableInteractive();
+                            self.player3Info.hand.push(drawnCard);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                let drawnCard = null;
+
+                for (let i = 0; i < self.playZoneCards.length; i++)
+                {
+                    if (self.playZoneCards[i].texture.key === drawnCardKey)
+                    {
+                        drawnCard = self.playZoneCards[i];
+                        break;
+                    }
+                }
+
+                if (userType === 'player')
+                {
+                    if (self.player2Info.id === playerID)
+                    {
+                        drawnCard.setX(700).setY(160).setTexture('cardBack').disableInteractive();
+                        self.player2Info.hand.push(drawnCard);
+                        self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
+                    }
+                    else
+                    {
+                        if (self.numPlayers === 4)
+                        {
+                            if (self.player3Info.id === playerID)
+                            {
+                                drawnCard.setX(180).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                                self.player3Info.hand.push(drawnCard);
+                                self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                            }
+                            else
+                            {
+                                drawnCard.setX(1720).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                                self.player4Info.hand.push(drawnCard);
+                                self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
+                            }
+                        }
+                        else
+                        {
+                            drawnCard.setX(180).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                            self.player3Info.hand.push(drawnCard);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                        }
                     }
                 }
                 else
                 {
                     if (self.player1Info.id === playerID)
                     {
-                        self.player1Info.hand[0].setVisible(false);
+                        drawnCard.setX(700).setY(920).setTexture('cardBack').disableInteractive();
+                        self.player1Info.hand.push(drawnCard);
+                        self.player1CardText.setText([`Cards: ${self.player1Info.hand.length}`]);
+                    }
+                    else if (self.player2Info.id === playerID)
+                    {
+                        drawnCard.setX(700).setY(160).setTexture('cardBack').disableInteractive();
+                        self.player2Info.hand.push(drawnCard);
+                        self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
                     }
                     else
                     {
-                        self.player2Info.hand[0].setVisible(false);
+                        if (self.numPlayers === 4)
+                        {
+                            if (self.player3Info.id === playerID)
+                            {
+                                drawnCard.setX(180).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                                self.player3Info.hand.push(drawnCard);
+                                self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                            }
+                            else
+                            {
+                                drawnCard.setX(1720).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                                self.player4Info.hand.push(drawnCard);
+                                self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
+                            }
+                        }
+                        else
+                        {
+                            drawnCard.setX(180).setY(480).setAngle(-90).setTexture('cardBack').disableInteractive();
+                            self.player3Info.hand.push(drawnCard);
+                            self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
+                        }
                     }
                 }
             }
-
-            let newZoneCard = new Card(self);
-            self.playZoneCards.push(newZoneCard.render(posX, posY, 'zone', cardName));
         });
     }
 

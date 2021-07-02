@@ -304,7 +304,7 @@ io.on('connection', (socket) => {
         roundInProgress = true;
         redirectUserTotal = players.length + spectators.length;
 
-        console.log(`New round of Durak started with ${players.length} player(s) and ${spectators.length} spectator(s)`);
+        console.log(`New session of Durak started with ${players.length} player(s) and ${spectators.length} spectator(s)`);
         console.log('Redirecting users to game...');
 
         io.in(lobbyRoom).emit('removeLobbyMenus');
@@ -461,10 +461,21 @@ io.on('connection', (socket) => {
         io.to(socket.id).emit('firstTurnDeal', userType, playersInfo, deck, trumpCard);
     });
 
-    socket.on('playZoneDrop', (playerID, cardName, posX, posY) => {
-        socket.to(playerRoom).emit('playZoneDrop', playerID, 'player', cardName, posX, posY)
-        io.in(spectatorRoom).emit('playZoneDrop', playerID, 'spectator', cardName, posX, posY);
+    socket.on('playZoneDrop', (playerID, cardKey, posX, posY) => {
+        socket.to(playerRoom).emit('playZoneDrop', playerID, 'player', cardKey, posX, posY)
+        io.in(spectatorRoom).emit('playZoneDrop', playerID, 'spectator', cardKey, posX, posY);
     });
+
+    socket.on('cardDiscarded', cardKey => {
+        socket.to(playerRoom).emit('cardDiscarded', cardKey);
+        io.in(spectatorRoom).emit('cardDiscarded', cardKey);
+    });
+
+    socket.on('cardDrawn', (playerID, drawnCardKey) => {
+        socket.to(playerRoom).emit('cardDrawn', 'player', playerID, drawnCardKey);
+        io.in(spectatorRoom).emit('cardDrawn', 'spectator', playerID, drawnCardKey);
+    });
+
 
     socket.on('disconnect', () => {
         console.log(`A user disconnected: ${socket.id}`);
