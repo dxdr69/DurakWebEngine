@@ -423,7 +423,7 @@ socket.on('removeLobbyMenus', () => {
     freezeClick = true;
 
     document.body.innerHTML = `<div class="alert alert-success" role="alert">
-                                <h4 class="alert-heading">A new round of Durak has been started</h4>
+                                <h4 class="alert-heading">A new Durak session has been started</h4>
                                 <p>Please wait while you are redirected to the game...</p>
                                </div>`;
 });

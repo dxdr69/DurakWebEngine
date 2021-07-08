@@ -1,3 +1,4 @@
+/* eslint-disable no-dupe-else-if */
 /* eslint-disable no-unused-vars */
 const express = require('express');
 const http = require('http');
@@ -13,16 +14,21 @@ app.use(express.urlencoded({extended: true}));
 const server = http.createServer(app);
 const io = new Server(server);
 
-const theDealer = new Dealer();
+let theDealer = new Dealer();
 
 let nicknames = [];
 let players = [];
 let spectators = [];
+let playersForRedirect = [];
+let spectatorsForRedirect = [];
 
 let currentLeader = null;
+let sessionInProgress = false;
+let lobbyRedirect = false;
+let usersLeftLobby = false;
 let usersRedirected = false;
-let roundInProgress = false;
 let redirectUserTotal = null;
+let endSession = false;
 
 
 
@@ -44,6 +50,10 @@ app.get('/game', (req, res) => {
     res.render('game');
 });
 
+app.get('/end', (req, res) => {
+    res.render('end');
+});
+
 app.post('/join', (req, res) => {
     const nickname = encodeURIComponent(req.body.nickname);
     res.redirect(`/lobby?nickname=${nickname}`);
@@ -56,7 +66,7 @@ io.on('connection', (socket) => {
     const playerRoom = 'players';
     const spectatorRoom = 'spectators';
 
-    if (roundInProgress === false)
+    if (sessionInProgress === false)
     {
         console.log(`New user connected: ${socket.id}`);
 
@@ -301,13 +311,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('lobbyRedirect', async () => {
-        roundInProgress = true;
+        sessionInProgress = true;
+        lobbyRedirect = true;
         redirectUserTotal = players.length + spectators.length;
 
         console.log(`New session of Durak started with ${players.length} player(s) and ${spectators.length} spectator(s)`);
         console.log('Redirecting users to game...');
 
         io.in(lobbyRoom).emit('removeLobbyMenus');
+
+        players.forEach(player => {
+            playersForRedirect.push(player.id);
+        });
+
+        spectators.forEach(spectator => {
+            spectatorsForRedirect.push(spectator.id)
+        });
 
         const destination = '/game';
 
@@ -350,7 +369,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('setRedirectUser', (userType, nickname) => {
-        redirectUserTotal -= 1;
+        redirectUserTotal--;
 
         if (userType === 'leader')
         {
@@ -476,6 +495,58 @@ io.on('connection', (socket) => {
         io.in(spectatorRoom).emit('cardDrawn', 'spectator', playerID, drawnCardKey);
     });
 
+    socket.on('clearCards', () => {
+        socket.to(playerRoom).emit('clearCards');
+        io.in(spectatorRoom).emit('clearCards');
+        io.to(currentLeader.id).emit('anotherRound');
+    });
+
+    socket.on('anotherRound', () => {
+        console.log('Another round of Durak started for this session');
+
+        theDealer = new Dealer();
+        theDealer.resetDeck();
+
+        players.forEach(player => {
+            player.hand = theDealer.setPlayerHand();
+        });
+
+        console.log('All player hands have been set');
+
+        const trumpSuit = theDealer.setTrumpSuit();
+
+        switch(trumpSuit) {
+            case 'C':
+                console.log('Trump suit for this round is: Club');
+                break;
+            case 'D':
+                console.log('Trump suit for this round is: Diamond');
+                break;
+            case 'H':
+                console.log('Trump suit for this round is: Heart');
+                break;
+            case 'S':
+                console.log('Trump suit for this round is: Spade');
+                break;
+            default:
+                break;
+        }
+
+        let playersInfo = [];
+
+        for (let i = 0; i < players.length; i++)
+        {
+            playersInfo.push( { "id": players[i].id, "nickname": players[i].nickname, "hand": players[i].hand } );
+        }
+
+        const deck = theDealer.getDeck();
+        const trumpCard = theDealer.getTrumpCard();
+
+        io.in(playerRoom).emit('firstTurnDeal', 'player', playersInfo, deck, trumpCard);
+        io.in(spectatorRoom).emit('firstTurnDeal', 'spectator', playersInfo, deck, trumpCard);
+    });
+
+    
 
     socket.on('disconnect', () => {
         console.log(`A user disconnected: ${socket.id}`);
@@ -489,15 +560,28 @@ io.on('connection', (socket) => {
         {
             removedUser = players.splice(disconnectedUserIndex, 1)[0];
             userType = 'player';
+
+            if (lobbyRedirect)
+            {
+                playersForRedirect.splice(playersForRedirect.indexOf(removedUser.id), 1);
+            }
         }
         else
         {
             disconnectedUserIndex = spectators.findIndex(spectator => spectator.id === socket.id);
             removedUser = spectators.splice(disconnectedUserIndex, 1)[0];
             userType = 'spectator';
+
+            if (lobbyRedirect)
+            {
+                if (spectatorsForRedirect.length > 0)
+                {
+                    spectatorsForRedirect.splice(spectatorsForRedirect.indexOf(removedUser.id), 1);
+                }
+            }
         }
 
-        if (roundInProgress === false)
+        if (sessionInProgress === false || usersLeftLobby === false)
         {
             if (userType === 'player')
             {
@@ -535,12 +619,85 @@ io.on('connection', (socket) => {
                 }
             }
 
+            if (playersForRedirect.length === 0 && spectatorsForRedirect.length === 0)
+            {
+                usersLeftLobby = true;
+                lobbyRedirect = false;
+            }
+
             if (players.length === 0 && spectators.length === 0)
             {
                 console.log('All users disconnected');
             }
         }
+        else if (sessionInProgress === true && usersLeftLobby === true && usersRedirected === false)
+        {
+            if (userType === 'spectator')
+            {
+                if (spectators.length === 0)
+                {
+                    console.log('All spectators disconnected');
+                }
+            }
+            else if (userType === 'player')
+            {
+                console.log('A player has left during the middle of a session');
+                console.log('Ending session and redirecting users to end page...');
+                endSession = true;
+                usersRedirected = null;
+                const destination = '/end';
+                io.emit('endSession', destination);
+            }
+        }
+        else
+        {
+            if (userType === 'spectator')
+            {
+                if (spectators.length === 0)
+                {
+                    console.log('All spectators disconnected');
+                }
+            }
+            else if (userType === 'player')
+            {
+                if (players.length === 0)
+                {
+                    console.log('All players disconnected');
+                }
+
+                if (endSession === false)
+                {
+                    console.log('A player has left during the middle of a session');
+                    console.log('Ending session and redirecting users to end page...');
+                    endSession = true;
+                    const destination = '/end';
+                    io.emit('endSession', destination);
+                }
+                else if (endSession === true && players.length === 0 && spectators.length === 0)
+                {
+                    console.log('All users redirected to end page, resetting server variables...');
+    
+                    theDealer = new Dealer();
+    
+                    let empty = [];
+                    nicknames = Array.from(empty);
+                    players = Array.from(empty);
+                    spectators = Array.from(empty);
+        
+                    currentLeader = null;
+                    sessionInProgress = false;
+                    lobbyRedirect = false;
+                    usersLeftLobby = false;
+                    usersRedirected = false;
+                    redirectUserTotal = null;
+                    endSession = false;
+    
+                    console.log('Server variables reset');
+                }
+            }
+        }
     });
+    
 });
 
 server.listen(3000, () => {

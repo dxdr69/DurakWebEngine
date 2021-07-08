@@ -134,8 +134,14 @@ class Durak extends Phaser.Scene {
         this.player4NameText = null;
         this.player4CardText = null;
 
-        this.leaderEndGameText = null;
         this.leaderAnotherRoundText = null;
+        this.allTextSet = false;
+
+        if (this.leaderAnotherRoundText === null)
+        {
+            let text = new Text(self);
+            this.leaderAnotherRoundText = text.renderText(325, 250, [''], false);
+        }
 
 
 
@@ -223,9 +229,84 @@ class Durak extends Phaser.Scene {
             }
         });
 
+        this.leaderAnotherRoundText.on('pointerover', () => {
+            this.leaderAnotherRoundText.setColor('#ff1f9e');
+        });
+
+        this.leaderAnotherRoundText.on('pointerout', () => {
+            this.leaderAnotherRoundText.setColor('#ffffff'); 
+        });
+
+        this.leaderAnotherRoundText.on('pointerdown', () => {
+           this.deck.forEach(card => {
+               card.destroy();
+           });
+           
+           let empty = [];
+           this.deck = Array.from(empty);
+
+           this.playZoneCards.forEach(card => {
+               card.destroy();
+           });
+
+           this.playZoneCards = Array.from(empty);
+
+           this.player1Info.hand.forEach(card => {
+               card.destroy();
+           });
+           this.player1Info.hand = Array.from(empty);
+           this.player1CardText.destroy();
+           this.player1NameText.destroy();
+           this.player1CardText = null;
+           this.player1NameText = null;
+
+           this.player2Info.hand.forEach(card => {
+               card.destroy();
+           });
+           this.player2Info.hand = Array.from(empty);
+           this.player2CardText.destroy();
+           this.player2NameText.destroy();
+           this.player2CardText = null;
+           this.player2NameText = null;
+
+           if (this.numPlayers === 4)
+           {
+            this.player3Info.hand.forEach(card => {
+                card.destroy();
+            });
+            this.player3Info.hand = Array.from(empty);
+            this.player3CardText.destroy();
+            this.player3NameText.destroy();
+            this.player3CardText = null;
+            this.player3NameText = null;
+
+            this.player4Info.hand.forEach(card => {
+                card.destroy();
+            });
+            this.player4Info.hand = Array.from(empty);
+            this.player4CardText.destroy();
+            this.player4NameText.destroy();
+            this.player4CardText = null;
+            this.player4NameText = null;
+           }
+           else if (this.numPlayers === 3)
+           {
+            this.player3Info.hand.forEach(card => {
+                card.destroy();
+            });
+            this.player3Info.hand = Array.from(empty);
+            this.player3CardText.destroy();
+            this.player3NameText.destroy();
+            this.player3CardText = null;
+            this.player3NameText = null;
+           }
+
+           this.allTextSet = false;
+           this.socket.emit('clearCards');
+        });
 
 
-
+        
         this.socket = io();
 
         this.socket.on('connect', () => {
@@ -476,31 +557,39 @@ class Durak extends Phaser.Scene {
                 self.deck = Array.from(unreverseDeck);
             }
 
-            let text = new Text(self);
-            self.player1NameText = text.renderText(710, 770, [`${self.player1Info.nickname}`], false);
-            self.player1CardText = text.renderText(1100, 770, [`Cards: ${self.player1Info.hand.length}`], false);
-
-            self.player2NameText = text.renderText(710, 300, [`${self.player2Info.nickname}`], false);
-            self.player2CardText = text.renderText(1100, 300, [`Cards: ${self.player2Info.hand.length}`], false);
-
-            if (self.numPlayers === 3)
+            if (self.allTextSet === false)
             {
-                self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
-                self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
-            }
-            else if (self.numPlayers === 4)
-            {
-                self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
-                self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
+                let text = new Text(self);
+                self.player1NameText = text.renderText(710, 770, [`${self.player1Info.nickname}`], false);
+                self.player1CardText = text.renderText(1100, 770, [`Cards: ${self.player1Info.hand.length}`], false);
+    
+                self.player2NameText = text.renderText(710, 300, [`${self.player2Info.nickname}`], false);
+                self.player2CardText = text.renderText(1100, 300, [`Cards: ${self.player2Info.hand.length}`], false);
+    
+                if (self.numPlayers === 3)
+                {
+                    self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
+                    self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
+                }
+                else if (self.numPlayers === 4)
+                {
+                    self.player3NameText = text.renderText(310, 435, [`${self.player3Info.nickname}`], false);
+                    self.player3CardText = text.renderText(310, 450, [`Cards: ${self.player3Info.hand.length}`], false);
+    
+                    self.player4NameText = text.renderText(1530, 445, [`${self.player4Info.nickname}`], false);
+                    self.player4CardText = text.renderText(1530, 460, [`Cards: ${self.player4Info.hand.length}`], false);
+                }
+    
+                if (self.socket.id !== self.currentLeaderID)
+                {
+                    self.leaderAnotherRoundText.destroy();
+                }
+                else if (self.socket.id === self.currentLeaderID)
+                {
+                    self.leaderAnotherRoundText.setText(['Start another round']).setInteractive();
+                }
 
-                self.player4NameText = text.renderText(1530, 445, [`${self.player4Info.nickname}`], false);
-                self.player4CardText = text.renderText(1530, 460, [`Cards: ${self.player4Info.hand.length}`], false);
-            }
-
-            if (self.socket.id === self.currentLeaderID)
-            {
-                self.leaderAnotherRoundText = text.renderText(325, 250, ['Start another round'], true);
-                self.leaderEndGameText = text.renderText(325, 265, ['End session'], true);
+                self.allTextSet = true;
             }
         });
 
@@ -768,6 +857,81 @@ class Durak extends Phaser.Scene {
                     }
                 }
             }
+        });
+
+        this.socket.on('clearCards', () => {
+            self.deck.forEach(card => {
+                card.destroy();
+            });
+            
+            let empty = [];
+            self.deck = Array.from(empty);
+ 
+            self.playZoneCards.forEach(card => {
+                card.destroy();
+            });
+ 
+            self.playZoneCards = Array.from(empty);
+ 
+            self.player1Info.hand.forEach(card => {
+                card.destroy();
+            });
+            self.player1Info.hand = Array.from(empty);
+            self.player1CardText.destroy();
+            self.player1NameText.destroy();
+            self.player1CardText = null;
+            self.player1NameText = null;
+ 
+            self.player2Info.hand.forEach(card => {
+                card.destroy();
+            });
+            self.player2Info.hand = Array.from(empty);
+            self.player2CardText.destroy();
+            self.player2NameText.destroy();
+            self.player2CardText = null;
+            self.player2NameText = null;
+ 
+            if (self.numPlayers === 4)
+            {
+             self.player3Info.hand.forEach(card => {
+                 card.destroy();
+             });
+             self.player3Info.hand = Array.from(empty);
+             self.player3CardText.destroy();
+             self.player3NameText.destroy();
+             self.player3CardText = null;
+             self.player3NameText = null;
+ 
+             self.player4Info.hand.forEach(card => {
+                 card.destroy();
+             });
+             self.player4Info.hand = Array.from(empty);
+             self.player4CardText.destroy();
+             self.player4NameText.destroy();
+             self.player4CardText = null;
+             self.player4NameText = null;
+            }
+            else if (this.numPlayers === 3)
+            {
+             self.player3Info.hand.forEach(card => {
+                 card.destroy();
+             });
+             self.player3Info.hand = Array.from(empty);
+             self.player3CardText.destroy();
+             self.player3NameText.destroy();
+             self.player3CardText = null;
+             self.player3NameText = null;
+            }
+ 
+            self.allTextSet = false;
+        });
+
+        this.socket.on('anotherRound', () => {
+           this.socket.emit('anotherRound'); 
+        });
+
+        this.socket.on('endSession', destination => {
+            window.location.href = destination;
         });
     }
 
