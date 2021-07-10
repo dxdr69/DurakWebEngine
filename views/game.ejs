@@ -1,0 +1,16 @@
+<%- include('partials/header-ingame') %>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            width: 1920,
+            height: 1080,
+            scene: [
+                Durak
+            ]
+        };
+
+        const game = new Phaser.Game(config);
+    </script>
+<%- include('partials/footer') %> 
