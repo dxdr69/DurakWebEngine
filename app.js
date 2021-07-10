@@ -25,7 +25,6 @@ let spectatorsForRedirect = [];
 let currentLeader = null;
 let sessionInProgress = false;
 let lobbyRedirect = false;
-let usersLeftLobby = false;
 let usersRedirected = false;
 let redirectUserTotal = null;
 let endSession = false;
@@ -55,8 +54,15 @@ app.get('/end', (req, res) => {
 });
 
 app.post('/join', (req, res) => {
-    const nickname = encodeURIComponent(req.body.nickname);
-    res.redirect(`/lobby?nickname=${nickname}`);
+    if (!sessionInProgress && !lobbyRedirect)
+    {
+        const nickname = encodeURIComponent(req.body.nickname);
+        res.redirect(`/lobby?nickname=${nickname}`);
+    }
+    else
+    {
+        res.redirect('/end');
+    }
 });
 
 
@@ -66,7 +72,7 @@ io.on('connection', (socket) => {
     const playerRoom = 'players';
     const spectatorRoom = 'spectators';
 
-    if (sessionInProgress === false)
+    if (!sessionInProgress)
     {
         console.log(`New user connected: ${socket.id}`);
 
@@ -435,8 +441,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('newRoundPrep', () => {
-        theDealer.resetDeck();
-
         players.forEach(player => {
             player.hand = theDealer.setPlayerHand();
         });
@@ -504,7 +508,6 @@ io.on('connection', (socket) => {
     socket.on('anotherRound', () => {
         console.log('Another round of Durak started for this session');
 
-        theDealer = new Dealer();
         theDealer.resetDeck();
 
         players.forEach(player => {
@@ -581,48 +584,52 @@ io.on('connection', (socket) => {
             }
         }
 
-        if (sessionInProgress === false || usersLeftLobby === false)
+        if (!sessionInProgress || lobbyRedirect)
         {
-            if (userType === 'player')
+            if (!sessionInProgress)
             {
-                if (players.length > 0 && removedUser.id === currentLeader.id)
+                if (userType === 'player')
                 {
-                    players[0].isLeader = true;
-                    currentLeader.id = players[0].id;
-                    currentLeader.nickname = players[0].nickname;
-                    console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+                    if (players.length > 0 && removedUser.id === currentLeader.id)
+                    {
+                        players[0].isLeader = true;
+                        currentLeader.id = players[0].id;
+                        currentLeader.nickname = players[0].nickname;
+                        console.log(`Player with ID of: ${currentLeader.id} has been set as the new leader`);
+            
+                        io.in(lobbyRoom).emit('changeLeaderID', currentLeader.id);
+                        io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader.nickname);
+                    }
+                    else if (players.length > 0)
+                    {
+                        io.in(lobbyRoom).emit('changeLobbyPlayer', removedUser.nickname);
+                    }
+                    else
+                    {
+                        console.log('All players have disconnected');
+                        
+                        currentLeader = null;
         
-                    io.in(lobbyRoom).emit('changeLeaderID', currentLeader.id);
-                    io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader.nickname);
-                }
-                else if (players.length > 0)
-                {
-                    io.in(lobbyRoom).emit('changeLobbyPlayer', removedUser.nickname);
+                        io.in(lobbyRoom).emit('changeLeaderID', currentLeader);
+                        io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader);
+                    }
                 }
                 else
                 {
-                    console.log('All players have disconnected');
-                    
-                    currentLeader = null;
+                    io.in(lobbyRoom).emit('changeLobbySpectator', removedUser.nickname);
     
-                    io.in(lobbyRoom).emit('changeLeaderID', currentLeader);
-                    io.in(lobbyRoom).emit('changeLobbyLeader', currentLeader);
+                    if (spectators.length === 0)
+                    {
+                        console.log('All spectators disconnected');
+                    }
                 }
             }
             else
             {
-                io.in(lobbyRoom).emit('changeLobbySpectator', removedUser.nickname);
-
-                if (spectators.length === 0)
+                if (playersForRedirect.length === 0 && spectatorsForRedirect.length === 0)
                 {
-                    console.log('All spectators disconnected');
+                    lobbyRedirect = false;
                 }
-            }
-
-            if (playersForRedirect.length === 0 && spectatorsForRedirect.length === 0)
-            {
-                usersLeftLobby = true;
-                lobbyRedirect = false;
             }
 
             if (players.length === 0 && spectators.length === 0)
@@ -630,7 +637,7 @@ io.on('connection', (socket) => {
                 console.log('All users disconnected');
             }
         }
-        else if (sessionInProgress === true && usersLeftLobby === true && usersRedirected === false)
+        else if (sessionInProgress && lobbyRedirect && !usersRedirected)
         {
             if (userType === 'spectator')
             {
@@ -644,7 +651,7 @@ io.on('connection', (socket) => {
                 console.log('A player has left during the middle of a session');
                 console.log('Ending session and redirecting users to end page...');
                 endSession = true;
-                usersRedirected = null;
+                usersRedirected = true;
                 const destination = '/end';
                 io.emit('endSession', destination);
             }
@@ -665,7 +672,7 @@ io.on('connection', (socket) => {
                     console.log('All players disconnected');
                 }
 
-                if (endSession === false)
+                if (!endSession)
                 {
                     console.log('A player has left during the middle of a session');
                     console.log('Ending session and redirecting users to end page...');
@@ -673,7 +680,7 @@ io.on('connection', (socket) => {
                     const destination = '/end';
                     io.emit('endSession', destination);
                 }
-                else if (endSession === true && players.length === 0 && spectators.length === 0)
+                else if (endSession && players.length === 0 && spectators.length === 0)
                 {
                     console.log('All users redirected to end page, resetting server variables...');
     
@@ -683,11 +690,12 @@ io.on('connection', (socket) => {
                     nicknames = Array.from(empty);
                     players = Array.from(empty);
                     spectators = Array.from(empty);
+                    playersForRedirect = Array.from(empty);
+                    spectatorsForRedirect = Array.from(empty);
         
                     currentLeader = null;
                     sessionInProgress = false;
                     lobbyRedirect = false;
-                    usersLeftLobby = false;
                     usersRedirected = false;
                     redirectUserTotal = null;
                     endSession = false;

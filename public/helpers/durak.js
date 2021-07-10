@@ -91,6 +91,7 @@ class Durak extends Phaser.Scene {
 
         this.deck = [];
         this.playZoneCards = [];
+        this.trumpCardKey = null;
         
         this.player1Info = null;
         this.player2Info = null;
@@ -171,13 +172,29 @@ class Durak extends Phaser.Scene {
                 }
                 else
                 {
-                    this.playZoneCards.push(gameObject);
-                    this.player1Info.hand.splice(this.player1Info.hand.indexOf(gameObject), 1);
-                    this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
-                    const posX = gameObject.x;
-                    const posY = gameObject.y;
-                    const cardKey = gameObject.texture.key;
-                    this.socket.emit('playZoneDrop', self.socket.id, cardKey, posX, posY);
+                    let fromDeck = false;
+
+                    this.deck.forEach(card => {
+                        if ( (gameObject.texture.key === card.texture.key) && (gameObject.texture.key === this.trumpCardKey) )
+                        {
+                            fromDeck = true;
+                        }
+                    });
+
+                    if (fromDeck)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        this.playZoneCards.push(gameObject);
+                        this.player1Info.hand.splice(this.player1Info.hand.indexOf(gameObject), 1);
+                        this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                        const posX = gameObject.x;
+                        const posY = gameObject.y;
+                        const cardKey = gameObject.texture.key;
+                        this.socket.emit('playZoneDrop', this.socket.id, cardKey, posX, posY);
+                    }
                 }
             }
             else if (dropZone === this.discardZone)
@@ -188,29 +205,80 @@ class Durak extends Phaser.Scene {
                 }
                 else
                 {
-                    this.playZoneCards.splice(this.playZoneCards.indexOf(gameObject), 1);
-                    const cardKey = gameObject.texture.key;
-                    gameObject.destroy();
-                    this.socket.emit('cardDiscarded', cardKey);
+                    let fromPlayerHand = false;
+
+                    this.player1Info.hand.forEach(card => {
+                        if (gameObject.texture.key === card.texture.key)
+                        {
+                            fromPlayerHand = true;
+                        }
+                    });
+
+                    let fromDeck = false;
+
+                    this.deck.forEach(card => {
+                        if ( (gameObject.texture.key === card.texture.key) && (gameObject.texture.key === this.trumpCardKey) )
+                        {
+                            fromDeck = true;
+                        }
+                    });
+
+                    if (fromPlayerHand || fromDeck)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        this.playZoneCards.splice(this.playZoneCards.indexOf(gameObject), 1);
+                        const cardKey = gameObject.texture.key;
+                        gameObject.destroy();
+                        this.socket.emit('cardDiscarded', cardKey);
+                    }
                 }
             }
             else if (dropZone === this.player1Zone)
             {
                 if (gameObject.texture.key === 'cardBack')
                 {
-                    const drawnCardKey = self.deck.shift().name;
+                    const drawnCardKey = this.deck.shift().name;
                     gameObject.setTexture(drawnCardKey);
                     this.player1Info.hand.push(gameObject);
                     this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
-                    this.socket.emit('cardDrawn', self.socket.id, null);
+
+                    if (this.deck.length > 0)
+                    {
+                        this.input.setDraggable(this.deck[0].setInteractive());
+                    }
+
+                    this.socket.emit('cardDrawn', this.socket.id, null);
                 }
-                else if (self.deck.length === 1)
+                else if (gameObject.texture.key === this.trumpCardKey)
                 {
-                    self.deck.shift();
-                    gameObject.setAngle(0);
-                    this.player1Info.hand.push(gameObject);
-                    this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
-                    this.socket.emit('cardDrawn', self.socket.id, null);
+                    let fromDeck = false;
+
+                    this.deck.forEach(card => {
+                        if (gameObject.texture.key === card.texture.key)
+                        {
+                            fromDeck = true;
+                        }
+                    });
+
+                    if (fromDeck)
+                    {
+                        this.deck.shift();
+                        gameObject.setAngle(0);
+                        this.player1Info.hand.push(gameObject);
+                        this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                        this.socket.emit('cardDrawn', this.socket.id, null);
+                    }
+                    else
+                    {
+                        this.playZoneCards.splice(this.playZoneCards.indexOf(gameObject, 1));
+                        gameObject.setAngle(0);
+                        this.player1Info.hand.push(gameObject);
+                        this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
+                        this.socket.emit('cardDrawn', this.socket.id, null);
+                    }
                 }
                 else
                 {
@@ -220,10 +288,11 @@ class Durak extends Phaser.Scene {
                     }
                     else
                     {
+                        this.playZoneCards.splice(this.playZoneCards.indexOf(gameObject, 1));
                         this.player1Info.hand.push(gameObject);
                         this.player1CardText.setText([`Cards: ${this.player1Info.hand.length}`]);
                         const drawnCardKey = gameObject.texture.key;
-                        this.socket.emit('cardDrawn', self.socket.id, drawnCardKey);
+                        this.socket.emit('cardDrawn', this.socket.id, drawnCardKey);
                     }
                 }
             }
@@ -310,8 +379,7 @@ class Durak extends Phaser.Scene {
         this.socket = io();
 
         this.socket.on('connect', () => {
-            console.log('Client connected');
-            console.log(`Your ID is: ${self.socket.id}`);
+            return;
         });
 
         this.socket.on('setRedirectUser', () => {
@@ -324,7 +392,6 @@ class Durak extends Phaser.Scene {
 
         this.socket.on('setRedirectLeader', currentLeaderID => {
             self.currentLeaderID = currentLeaderID;
-            console.log(`The ID of the leader is: ${self.currentLeaderID}`);
         });
 
         this.socket.on('newRoundPrep', () => {
@@ -355,6 +422,7 @@ class Durak extends Phaser.Scene {
         });
 
         this.socket.on('firstTurnDeal', (userType, playersInfo, currentDeck, trumpCard) => {
+            self.trumpCardKey = trumpCard;
             let playersInfoCopy = Array.from(playersInfo);
 
             if (userType === 'player')
@@ -519,13 +587,15 @@ class Durak extends Phaser.Scene {
             if (userType === 'player')
             {
                 let bottomCard = new Card(self);
-                self.deck.push(bottomCard.render(160, 160, 'player', trumpCard).setAngle(-90).setName(trumpCard));
+                self.deck.push(bottomCard.render(160, 160, 'opponent', trumpCard).setAngle(-90).setName(trumpCard));
     
                 for (let i = currentDeck.length-2; i >= 0; i--)
                 {
                     let deckCard = new Card (self);
-                    self.deck.push(deckCard.render(180, 160, 'player', opponentSprite).setName(currentDeck[i]));
+                    self.deck.push(deckCard.render(180, 160, 'opponent', opponentSprite).setName(currentDeck[i]));
                 }
+
+                self.input.setDraggable(self.deck[self.deck.length-1].setInteractive());
     
                 let unreverseDeck = [];
     
@@ -644,13 +714,15 @@ class Durak extends Phaser.Scene {
             {
                 if (self.player1Info.id === playerID)
                 {
-                    const card = self.player1Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                    const card = self.player1Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);
+                    self.playZoneCards.push(card);                                  
                     self.children.bringToTop(card);
                     self.player1CardText.setText([`Cards: ${self.player1Info.hand.length}`]);      
                 }
                 else if (self.player2Info.id === playerID)
                 {
-                    const card = self.player2Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                    const card = self.player2Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);
+                    self.playZoneCards.push(card);                                  
                     self.children.bringToTop(card);
                     self.player2CardText.setText([`Cards: ${self.player2Info.hand.length}`]);
                 }
@@ -660,20 +732,23 @@ class Durak extends Phaser.Scene {
                     {
                         if (self.player3Info.id === playerID)
                         {
-                            const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                            const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);
+                            self.playZoneCards.push(card);                                  
                             self.children.bringToTop(card);
                             self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
                         }
                         else
                         {
-                            const card = self.player4Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                            const card = self.player4Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);
+                            self.playZoneCards.push(card);                                  
                             self.children.bringToTop(card);
                             self.player4CardText.setText([`Cards: ${self.player4Info.hand.length}`]);
                         }
                     }
                     else
                     {
-                        const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);                                  
+                        const card = self.player3Info.hand.splice(0,1)[0].setX(posX).setY(posY).setAngle(0).setTexture(cardKey);
+                        self.playZoneCards.push(card);                                  
                         self.children.bringToTop(card);
                         self.player3CardText.setText([`Cards: ${self.player3Info.hand.length}`]);
                     }
@@ -697,6 +772,11 @@ class Durak extends Phaser.Scene {
                 if (userType === 'player')
                 {
                     const drawnCard = self.deck.shift();
+
+                    if (self.deck.length > 0)
+                    {
+                        self.input.setDraggable(self.deck[0].setInteractive());
+                    }
     
                     if (self.player2Info.id === playerID)
                     {
@@ -779,7 +859,7 @@ class Durak extends Phaser.Scene {
                 {
                     if (self.playZoneCards[i].texture.key === drawnCardKey)
                     {
-                        drawnCard = self.playZoneCards[i];
+                        drawnCard = self.playZoneCards.splice(i, 1)[0];
                         break;
                     }
                 }

@@ -10,7 +10,7 @@ class Card {
                 scene.input.setDraggable(card);
                 return card;
             }
-            else if (cardType === 'zone' || cardType === 'opponent')
+            else if (cardType === 'opponent')
             {
                 let card = scene.add.image(x, y, sprite).setScale(0.22, 0.22);
                 return card;

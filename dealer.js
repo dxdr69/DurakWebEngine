@@ -71,7 +71,7 @@ module.exports = class Dealer {
         this.deck.push('AS');
 
 
-        this.deckInUse = this.deck;
+        this.deckInUse = Array.from(this.deck);
         this.trumpCard = null;
         this.trumpSuit = null;
     }
@@ -85,7 +85,7 @@ module.exports = class Dealer {
     {
         if (this.deckInUse.length !== this.deck.length)
         {
-            this.deckInUse = this.deck;
+            this.deckInUse = Array.from(this.deck);
         }
     }
 

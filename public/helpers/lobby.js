@@ -63,8 +63,7 @@ spectatorForm.addEventListener('submit', e => {
 
 
 socket.on('connect', () => {
-    console.log('Client connected');
-    console.log(`Your ID is: ${socket.id}`);
+    return;
 });
 
 socket.on('changeLeaderID', (leaderID) => {
